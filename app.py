@@ -13,7 +13,7 @@ from openpyxl.chart.label import DataLabelList
 def merge_data_app():
     st.header("合并数据表格")
     
-    uploaded_files = st.file_uploader("选择需要合并的 Excel 或 CSV 文件", type=["xlsx", "xls", "csv"], accept_multiple_files=True, key="merge_files")
+    uploaded_files = st.file_uploader("选择需要合并的 Excel 文件", type=["xlsx", "xls", "csv"], accept_multiple_files=True, key="merge_files")
     save_filename = st.text_input("请输入合并后的文件名（例如：output.xlsx）", key="merge_save")
     
     if st.button("合并文件", key="merge_button"):
