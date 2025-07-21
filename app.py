@@ -13,13 +13,15 @@ from openpyxl.chart.label import DataLabelList
 def merge_data_app():
     st.header("合并数据表格")
     
-    folder_path = st.text_input("请输入包含待合并文件的文件夹路径", key="merge_folder")
-    save_path = st.text_input("请输入合并后的文件保存路径（包含文件名，如 output.xlsx）", key="merge_save")
+    folder_path = st.text_input("请输入包含待合并文件的文件夹路径（例如：/tmp）", key="merge_folder")
+    save_filename = st.text_input("请输入合并后的文件名（例如：output.xlsx）", key="merge_save")
     
     if st.button("合并文件", key="merge_button"):
-        if not folder_path or not save_path:
-            st.warning("请确保已输入文件夹路径和保存路径")
+        if not folder_path or not save_filename:
+            st.warning("请确保已输入文件夹路径和文件名")
             return
+        
+        save_path = os.path.join("/tmp", save_filename) if not save_filename.startswith("/tmp") else save_filename
         
         try:
             files = [f for f in os.listdir(folder_path) if f.endswith(('.xlsx', '.xls', '.csv'))]
@@ -54,12 +56,12 @@ def merge_data_app():
                 st.download_button(
                     label="下载合并后的文件",
                     data=buffer,
-                    file_name=os.path.basename(save_path),
+                    file_name=os.path.basename(save_filename),
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="download_merged"
                 )
-                st.success(f"表格已成功合并，可下载或保存到 {save_path}")
-                if st.checkbox("保存到本地路径", key="save_merged"):
+                st.success(f"表格已成功合并，可通过下载按钮获取文件")
+                if st.checkbox("保存到 /tmp 目录", key="save_merged"):
                     merged_df.to_excel(save_path, index=False, engine='openpyxl')
                     st.success(f"文件已保存到 {save_path}")
             else:
@@ -104,7 +106,7 @@ def search_insight_app():
     
     # 数据文件上传
     uploaded_file = st.file_uploader("选择数据文件", type=["xlsx", "xls"], key="data_file")
-    save_folder = st.text_input("请输入保存文件夹的路径", key="save_folder")
+    save_filename = st.text_input("请输入输出文件名（例如：result.xlsx）", key="save_folder")
     
     # 输入产品参数
     st.subheader("输入产品参数")
@@ -112,9 +114,11 @@ def search_insight_app():
     param_values = st.text_area("具体参数（每行一个参数组，用逗号分隔，如 红,蓝\n小,大）", key="param_values")
     
     if st.button("执行", key="execute_button"):
-        if not uploaded_file or not save_folder or not param_names or not param_values:
-            st.warning("请确保已上传数据文件、输入保存文件夹路径和产品参数")
+        if not uploaded_file or not save_filename or not param_names or not param_values:
+            st.warning("请确保已上传数据文件、输入输出文件名和产品参数")
             return
+        
+        save_path = os.path.join("/tmp", save_filename) if not save_filename.startswith("/tmp") else save_filename
         
         try:
             df = pd.read_excel(uploaded_file)
@@ -182,7 +186,8 @@ def search_insight_app():
                             param_heats[param_name].append({'参数值': param, '搜索量': search_volumn})
             
             timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-            output_path = os.path.join(save_folder, f"result_{timestamp}.xlsx")
+            output_filename = f"result_{timestamp}.xlsx"
+            output_path = os.path.join("/tmp", output_filename)
             
             # Save to Excel with charts
             workbook = Workbook()
@@ -239,6 +244,7 @@ def search_insight_app():
                 if not df_selected.empty:
                     ws = workbook['品类流量结构']
                     chart = PieChart()
+                    labels = Reference(ws, min_col=1, min_row遊
                     labels = Reference(ws, min_col=1, min_row=2, max_row=len(df_selected) + 2)
                     data = Reference(ws, min_col=2, min_row=1, max_row=len(df_selected) + 1)
                     chart.add_data(data, titles_from_data=True)
@@ -276,12 +282,12 @@ def search_insight_app():
             st.download_button(
                 label="下载处理结果",
                 data=buffer,
-                file_name=os.path.basename(output_path),
+                file_name=output_filename,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="download_result"
             )
-            st.success(f"数据处理完成，可下载或保存至：{output_path}")
-            if st.checkbox("保存到本地路径", key="save_result"):
+            st.success(f"数据处理完成，可通过下载按钮获取文件")
+            if st.checkbox("保存到 /tmp 目录", key="save_result"):
                 workbook.save(output_path)
                 st.success(f"文件已保存到 {output_path}")
         
