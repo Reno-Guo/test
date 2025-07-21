@@ -13,37 +13,31 @@ from openpyxl.chart.label import DataLabelList
 def merge_data_app():
     st.header("合并数据表格")
     
-    folder_path = st.text_input("请输入包含待合并文件的文件夹路径（例如：/tmp）", key="merge_folder")
+    uploaded_files = st.file_uploader("选择需要合并的 Excel 或 CSV 文件", type=["xlsx", "xls", "csv"], accept_multiple_files=True, key="merge_files")
     save_filename = st.text_input("请输入合并后的文件名（例如：output.xlsx）", key="merge_save")
     
     if st.button("合并文件", key="merge_button"):
-        if not folder_path or not save_filename:
-            st.warning("请确保已输入文件夹路径和文件名")
+        if not uploaded_files or not save_filename:
+            st.warning("请确保已选择文件并输入文件名")
             return
         
         save_path = os.path.join("/tmp", save_filename) if not save_filename.startswith("/tmp") else save_filename
         
         try:
-            files = [f for f in os.listdir(folder_path) if f.endswith(('.xlsx', '.xls', '.csv'))]
-            if not files:
-                st.warning("选定文件夹中没有找到 Excel 或 CSV 文件")
-                return
-            
             df_list = []
-            for file in files:
-                file_path = os.path.join(folder_path, file)
+            for file in uploaded_files:
                 try:
-                    if file.endswith('.xlsx'):
-                        df = pd.read_excel(file_path, engine='openpyxl')
-                    elif file.endswith('.xls'):
-                        df = pd.read_excel(file_path, engine='xlrd')
-                    elif file.endswith('.csv'):
-                        df = pd.read_csv(file_path)
-                    df['时间'] = os.path.splitext(file)[0]
+                    if file.name.endswith('.xlsx'):
+                        df = pd.read_excel(file, engine='openpyxl')
+                    elif file.name.endswith('.xls'):
+                        df = pd.read_excel(file, engine='xlrd')
+                    elif file.name.endswith('.csv'):
+                        df = pd.read_csv(file)
+                    df['时间'] = os.path.splitext(file.name)[0]
                     df = process_price_columns(df)
                     df_list.append(df)
                 except Exception as e:
-                    st.error(f"读取文件 {file} 失败：{e}")
+                    st.error(f"读取文件 {file.name} 失败：{e}")
                     continue
             
             if df_list:
