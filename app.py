@@ -244,7 +244,6 @@ def search_insight_app():
                 if not df_selected.empty:
                     ws = workbook['品类流量结构']
                     chart = PieChart()
-                    labels = Reference(ws, min_col=1, min_row遊
                     labels = Reference(ws, min_col=1, min_row=2, max_row=len(df_selected) + 2)
                     data = Reference(ws, min_col=2, min_row=1, max_row=len(df_selected) + 1)
                     chart.add_data(data, titles_from_data=True)
