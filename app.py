@@ -102,23 +102,26 @@ def search_insight_app():
     uploaded_file = st.file_uploader("选择数据文件", type=["xlsx", "xls"], key="data_file")
     save_filename = st.text_input("请输入输出文件名（例如：result.xlsx）", key="save_folder")
     
-    # 输入产品参数
-    st.subheader("输入产品参数")
-    param_names = st.text_input("参数名（用逗号分隔，如 颜色,尺寸）", key="param_names")
-    param_values = st.text_area("具体参数（每行一个参数组，用逗号分隔，如 红,蓝\n小,大）", key="param_values")
+    # 输入产品参数（可选）
+    st.subheader("输入产品参数（可选）")
+    param_names = st.text_input("参数名（用逗号分隔，如 颜色,尺寸，可留空）", key="param_names")
+    param_values = st.text_area("具体参数（每行一个参数组，用逗号分隔，如 红,蓝\n小,大，可留空）", key="param_values")
     
     if st.button("执行", key="execute_button"):
-        if not uploaded_file or not save_filename or not param_names or not param_values:
-            st.warning("请确保已上传数据文件、输入输出文件名和产品参数")
+        if not uploaded_file or not save_filename:
+            st.warning("请确保已上传数据文件并输入输出文件名")
             return
         
         save_path = os.path.join("/tmp", save_filename) if not save_filename.startswith("/tmp") else save_filename
         
         try:
             df = pd.read_excel(uploaded_file)
-            param_names_list = [name.strip() for name in param_names.split(',')]
-            param_values_list = [v.strip().split(',') for v in param_values.split('\n')]
-            product_parameters = list(zip(param_names_list, param_values_list))
+            # 处理产品参数（仅在提供参数时处理）
+            product_parameters = []
+            if param_names and param_values:
+                param_names_list = [name.strip() for name in param_names.split(',')]
+                param_values_list = [v.strip().split(',') for v in param_values.split('\n')]
+                product_parameters = list(zip(param_names_list, param_values_list))
             
             df['品牌'] = ''
             df['特性参数'] = ''
