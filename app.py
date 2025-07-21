@@ -188,28 +188,63 @@ def search_insight_app():
             
             # Save to Excel with charts
             workbook = Workbook()
+            # Remove default sheet to avoid empty sheet issues
+            if "Sheet" in workbook.sheetnames:
+                workbook.remove(workbook["Sheet"])
+            
             with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
                 writer.book = workbook
+                # Write source data
                 df.to_excel(writer, sheet_name='源数据', index=False)
-                brand_words_df.to_excel(writer, sheet_name='品牌词拆解', index=False)
                 
+                # Write brand words data if not empty
+                if not brand_words_df.empty:
+                    brand_words_df.to_excel(writer, sheet_name='品牌词拆解', index=False)
+                
+                # Write parameter data if any
                 for param_name, heats in param_heats.items():
                     if heats:
                         param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
                         clean_sheet_name = param_name[:31].translate(str.maketrans('', '', '\/?*[]'))
                         param_df.to_excel(writer, sheet_name=f"{clean_sheet_name}拆解", index=False)
                 
+                # Write traffic structure data if not empty
                 df_selected = df[['词性', '搜索量']].groupby('词性').sum().reset_index()
-                df_selected.to_excel(writer, sheet_name='品类流量结构', index=False)
+                if not df_selected.empty:
+                    df_selected.to_excel(writer, sheet_name='品类流量结构', index=False)
                 
-                # Add Excel charts
-                if not brand_words_df.empty:
-                    brand_words_sheet = workbook['品牌词拆解']
+                # Ensure at least one sheet exists
+                if not workbook.sheetnames:
+                    workbook.create_sheet('源数据')
+                    df.to_excel(writer, sheet_name='源数据', index=False)
+            
+            # Add Excel charts
+            if not brand_words_df.empty:
+                brand_words_sheet = workbook['品牌词拆解']
+                chart = PieChart()
+                chart.title = "品牌词拆解"
+                max_row = brand_words_df.shape[0] + 1
+                data = Reference(brand_words_sheet, min_col=2, min_row=1, max_col=2, max_row=max_row)
+                labels = Reference(brand_words_sheet, min_col=1, min_row=2, max_row=max_row)
+                chart.add_data(data, titles_from_data=True)
+                chart.set_categories(labels)
+                chart.dataLabels = DataLabelList()
+                chart.dataLabels.showCatName = True
+                chart.dataLabels.showPercent = True
+                chart.width = 12
+                chart.height = 10
+                brand_words_sheet.add_chart(chart, "G3")
+            
+            for param_name, heats in param_heats.items():
+                if heats:
+                    param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
+                    clean_sheet_name = param_name[:31].translate(str.maketrans('', '', '\/?*[]')) + "拆解"
+                    param_sheet = workbook[clean_sheet_name]
                     chart = PieChart()
-                    chart.title = "品牌词拆解"
-                    max_row = brand_words_df.shape[0] + 1
-                    data = Reference(brand_words_sheet, min_col=2, min_row=1, max_col=2, max_row=max_row)
-                    labels = Reference(brand_words_sheet, min_col=1, min_row=2, max_row=max_row)
+                    chart.title = f"{param_name} 参数搜索量分布"
+                    max_row_param = len(param_df) + 1
+                    data = Reference(param_sheet, min_col=2, min_row=1, max_col=2, max_row=max_row_param)
+                    labels = Reference(param_sheet, min_col=1, min_row=2, max_row=max_row_param)
                     chart.add_data(data, titles_from_data=True)
                     chart.set_categories(labels)
                     chart.dataLabels = DataLabelList()
@@ -217,40 +252,26 @@ def search_insight_app():
                     chart.dataLabels.showPercent = True
                     chart.width = 12
                     chart.height = 10
-                    brand_words_sheet.add_chart(chart, "G3")
-                
-                for param_name, heats in param_heats.items():
-                    if heats:
-                        param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
-                        clean_sheet_name = param_name[:31].translate(str.maketrans('', '', '\/?*[]')) + "拆解"
-                        param_sheet = workbook[clean_sheet_name]
-                        chart = PieChart()
-                        chart.title = f"{param_name} 参数搜索量分布"
-                        max_row_param = len(param_df) + 1
-                        data = Reference(param_sheet, min_col=2, min_row=1, max_col=2, max_row=max_row_param)
-                        labels = Reference(param_sheet, min_col=1, min_row=2, max_row=max_row_param)
-                        chart.add_data(data, titles_from_data=True)
-                        chart.set_categories(labels)
-                        chart.dataLabels = DataLabelList()
-                        chart.dataLabels.showCatName = True
-                        chart.dataLabels.showPercent = True
-                        chart.width = 12
-                        chart.height = 10
-                        param_sheet.add_chart(chart, "G3")
-                
-                if not df_selected.empty:
-                    ws = workbook['品类流量结构']
-                    chart = PieChart()
-                    labels = Reference(ws, min_col=1, min_row=2, max_row=len(df_selected) + 2)
-                    data = Reference(ws, min_col=2, min_row=1, max_row=len(df_selected) + 1)
-                    chart.add_data(data, titles_from_data=True)
-                    chart.set_categories(labels)
-                    chart.title = "流量结构"
-                    chart.dataLabels = DataLabelList()
-                    chart.dataLabels.showPercent = True
-                    chart.width = 12
-                    chart.height = 10
-                    ws.add_chart(chart, "G2")
+                    param_sheet.add_chart(chart, "G3")
+            
+            if not df_selected.empty:
+                ws = workbook['品类流量结构']
+                chart = PieChart()
+                labels = Reference(ws, min_col=1, min_row=2, max_row=len(df_selected) + 2)
+                data = Reference(ws, min_col=2, min_row=1, max_row=len(df_selected) + 1)
+                chart.add_data(data, titles_from_data=True)
+                chart.set_categories(labels)
+                chart.title = "流量结构"
+                chart.dataLabels = DataLabelList()
+                chart.dataLabels.showPercent = True
+                chart.width = 12
+                chart.height = 10
+                ws.add_chart(chart, "G2")
+            
+            # Save workbook to buffer for download
+            buffer = io.BytesIO()
+            workbook.save(buffer)
+            buffer.seek(0)
             
             # Display Plotly charts
             st.subheader("数据可视化")
@@ -272,9 +293,6 @@ def search_insight_app():
                 st.plotly_chart(fig, use_container_width=True)
             
             # Provide download link
-            buffer = io.BytesIO()
-            workbook.save(buffer)
-            buffer.seek(0)
             st.download_button(
                 label="下载处理结果",
                 data=buffer,
