@@ -313,8 +313,8 @@ def pie_chart(df, value_col, name_col, title):
     st.plotly_chart(fig, use_container_width=True)
 
 def search_insight_viz_app():
-    with st.expander("搜索流量洞察可视化", expanded=False):
-        st.header("搜索流量洞察可视化")
+    with st.expander("搜索流量洞察：聚合和可视化", expanded=False):
+        st.header("搜索流量洞察：聚合和可视化")
 
         uploaded_file = st.file_uploader("选择包含源数据的 Excel 文件(完成检查确认无误)", type=["xlsx", "xls"], key="viz_data_file")
         save_filename = st.text_input("请输入输出文件名（例如：viz_result.xlsx）", key="viz_save_folder")
