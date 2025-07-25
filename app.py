@@ -7,6 +7,7 @@ import io
 import zipfile
 import tempfile
 from openpyxl import Workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
 
 # 合并数据表格功能
 def merge_data_app():
