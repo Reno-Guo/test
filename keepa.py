@@ -2,13 +2,13 @@ import streamlit as st
 import pandas as pd
 import io
 import math
-from datetime import datetime
 
 # Streamlit app title
 st.title("Keepa数据整理与可视化")
 
-# File uploader
-uploaded_file = st.file_uploader("选择keepa导出文件", type=['xlsx', 'xls'])
+# Section 1: Data Processing
+st.header("数据处理")
+uploaded_file = st.file_uploader("选择Keepa导出的Excel文件", type=['xlsx', 'xls'], key="data_processing")
 
 if uploaded_file is not None:
     # Read Excel file
@@ -74,18 +74,44 @@ if uploaded_file is not None:
     
     # Reminder about adding sales column
     st.info("请在下载的 CSV 文件的 H 列添加 '销量' 列，以包含按月销售数据。")
+else:
+    st.write("请上传Excel文件以继续处理。")
+
+# Section 2: Visualization
+st.header("可视化")
+uploaded_csv = st.file_uploader("选择包含销量的CSV文件", type=['csv'], key="visualization")
+
+if uploaded_csv is not None:
+    # Read CSV file
+    viz_df = pd.read_csv(uploaded_csv, encoding='utf-8-sig')
     
-    # Visualization Section
-    st.write("### 可视化")
-    if '销量' in result_df.columns:
+    # Check required columns
+    required_columns = ['日期', '评分', '评分数', 'Prime价格天数', 'Coupon价格天数', 'Deal价格天数', '销量']
+    missing_columns = [col for col in required_columns if col not in viz_df.columns]
+    
+    if missing_columns:
+        st.error(f"上传的CSV文件缺少以下必要列：{', '.join(missing_columns)}")
+    else:
+        # Ensure data types
+        viz_df['日期'] = pd.to_datetime(viz_df['日期'], errors='coerce')
+        viz_df['评分'] = pd.to_numeric(viz_df['评分'], errors='coerce').fillna(0)
+        viz_df['评分数'] = pd.to_numeric(viz_df['评分数'], errors='coerce').fillna(0)
+        viz_df['Prime价格天数'] = pd.to_numeric(viz_df['Prime价格天数'], errors='coerce').fillna(0)
+        viz_df['Coupon价格天数'] = pd.to_numeric(viz_df['Coupon价格天数'], errors='coerce').fillna(0)
+        viz_df['Deal价格天数'] = pd.to_numeric(viz_df['Deal价格天数'], errors='coerce').fillna(0)
+        viz_df['销量'] = pd.to_numeric(viz_df['销量'], errors='coerce').fillna(0)
+        
+        # Format date to YY/MM
+        viz_df['日期'] = viz_df['日期'].dt.strftime('%y/%m')
+        
         # Prepare data for charts
-        labels = result_df['日期'].str[2:].tolist()  # Convert YYYY-MM to YY/MM
-        ratings = result_df['评分'].tolist()
-        review_counts = result_df['评分数'].tolist()
-        sales = result_df['销量'].tolist()
-        prime_days = result_df['Prime价格天数'].tolist()
-        coupon_days = result_df['Coupon价格天数'].tolist()
-        deal_days = result_df['Deal价格天数'].tolist()
+        labels = viz_df['日期'].tolist()
+        ratings = viz_df['评分'].tolist()
+        review_counts = viz_df['评分数'].tolist()
+        sales = viz_df['销量'].tolist()
+        prime_days = viz_df['Prime价格天数'].tolist()
+        coupon_days = viz_df['Coupon价格天数'].tolist()
+        deal_days = viz_df['Deal价格天数'].tolist()
         
         # Calculate max sales for y-axis
         max_sales = max(sales) if sales else 1000
@@ -354,7 +380,5 @@ if uploaded_file is not None:
             file_name="product_trend_charts.html",
             mime="text/html"
         )
-    else:
-        st.warning("请确保CSV文件中包含'销量'列以生成可视化图表。")
 else:
-    st.write("请上传Excel文件以继续处理。")
+    st.write("请上传包含销量的CSV文件以生成可视化图表。")
