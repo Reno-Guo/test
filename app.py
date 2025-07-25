@@ -341,83 +341,83 @@ def search_insight_viz_app():
                 buffer = io.BytesIO()
                 workbook.save(buffer)
                 buffer.seek(0)
-                
                 # 显示可视化
-st.subheader("数据可视化")
+                st.subheader("数据可视化")
 
-# 饼图 1：品牌词拆解
-if not brand_words_df.empty:
-    fig = px.pie(
-        brand_words_df,
-        values='搜索量',
-        names='品牌名称',
-        title="品牌词拆解"
-    )
-    fig.update_traces(
-        textinfo='percent',  # 仅显示百分比，减少标签长度
-        textposition='auto',  # 自动选择内部或外部
-        textfont=dict(size=12),  # 较小字体
-        pull=[0.05] * len(brand_words_df),  # 轻微拉伸切片
-        rotation=45  # 旋转饼图优化标签位置
-    )
-    fig.update_layout(
-        width=800,  # 增加图表宽度
-        height=600,  # 增加图表高度
-        margin=dict(t=50, b=50, l=50, r=50),  # 调整边距
-        showlegend=True,  # 显示图例
-        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)  # 水平图例置于底部
-    )
-    st.plotly_chart(fig, use_container_width=True)
+                # 饼图 1：品牌词拆解
+                if not brand_words_df.empty:
+                    fig = px.pie(
+                        brand_words_df,
+                        values='搜索量',
+                        names='品牌名称',
+                        title="品牌词拆解"
+                    )
+                    fig.update_traces(
+                        textinfo='percent',  # 仅显示百分比，减少标签长度
+                        textposition='auto',  # 自动选择内部或外部
+                        textfont=dict(size=12),  # 较小字体
+                        pull=[0.05] * len(brand_words_df),  # 轻微拉伸切片
+                        rotation=45  # 旋转饼图优化标签位置
+                    )
+                    fig.update_layout(
+                        width=800,  # 增加图表宽度
+                        height=600,  # 增加图表高度
+                        margin=dict(t=50, b=50, l=50, r=50),  # 调整边距
+                        showlegend=True,  # 显示图例
+                        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)  # 水平图例置于底部
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
 
-# 饼图 2：参数搜索量分布
-for param_name, heats in param_heats.items():
-    if heats:
-        param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
-        fig = px.pie(
-            param_df,
-            values='搜索量',
-            names='参数值',
-            title=f"{param_name} 参数搜索量分布"
-        )
-        fig.update_traces(
-            textinfo='percent',  # 仅显示百分比
-            textposition='auto',  # 自动选择位置
-            textfont=dict(size=12),  # 较小字体
-            pull=[0.05] * len(param_df),  # 轻微拉伸切片
-            rotation=45  # 旋转饼图
-        )
-        fig.update_layout(
-            width=800,
-            height=600,
-            margin=dict(t=50, b=50, l=50, r=50),
-            showlegend=True,
-            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
-        )
-        st.plotly_chart(fig, use_container_width=True)
+                # 饼图 2：参数搜索量分布
+                for param_name, heats in param_heats.items():
+                    if heats:
+                        param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum().sort_values(
+                            by='搜索量', ascending=False)
+                        fig = px.pie(
+                            param_df,
+                            values='搜索量',
+                            names='参数值',
+                            title=f"{param_name} 参数搜索量分布"
+                        )
+                        fig.update_traces(
+                            textinfo='percent',  # 仅显示百分比
+                            textposition='auto',  # 自动选择位置
+                            textfont=dict(size=12),  # 较小字体
+                            pull=[0.05] * len(param_df),  # 轻微拉伸切片
+                            rotation=45  # 旋转饼图
+                        )
+                        fig.update_layout(
+                            width=800,
+                            height=600,
+                            margin=dict(t=50, b=50, l=50, r=50),
+                            showlegend=True,
+                            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
 
-# 饼图 3：流量结构
-if not df_selected.empty:
-    fig = px.pie(
-        df_selected,
-        values='搜索量',
-        names='词性',
-        title="流量结构"
-    )
-    fig.update_traces(
-        textinfo='percent',  # 仅显示百分比
-        textposition='auto',  # 自动选择位置
-        textfont=dict(size=12),  # 较小字体
-        pull=[0.05] * len(df_selected),  # 轻微拉伸切片
-        rotation=45  # 旋转饼图
-    )
-    fig.update_layout(
-        width=800,
-        height=600,
-        margin=dict(t=50, b=50, l=50, r=50),
-        showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
-    )
-    st.plotly_chart(fig, use_container_width=True)
+                # 饼图 3：流量结构
+                if not df_selected.empty:
+                    fig = px.pie(
+                        df_selected,
+                        values='搜索量',
+                        names='词性',
+                        title="流量结构"
+                    )
+                    fig.update_traces(
+                        textinfo='percent',  # 仅显示百分比
+                        textposition='auto',  # 自动选择位置
+                        textfont=dict(size=12),  # 较小字体
+                        pull=[0.05] * len(df_selected),  # 轻微拉伸切片
+                        rotation=45  # 旋转饼图
+                    )
+                    fig.update_layout(
+                        width=800,
+                        height=600,
+                        margin=dict(t=50, b=50, l=50, r=50),
+                        showlegend=True,
+                        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
 
                 # 提供下载链接
                 st.download_button(
