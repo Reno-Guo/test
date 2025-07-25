@@ -290,9 +290,9 @@ def pie_chart(df, value_col, name_col, title):
     fig.update_layout(
         height=900,
         legend=dict(
-            orientation="h",
-            x=0.5,
-            y=-0.1,
+            orientation="v",
+            x=0.75,
+            y=0.5,
             font=dict(size=16)
         ),
         margin=dict(l=20, r=150, t=50, b=50),
