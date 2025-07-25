@@ -8,7 +8,6 @@ import zipfile
 import tempfile
 from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
-import plotly.express as px
 
 # 合并数据表格功能
 def merge_data_app():
@@ -345,21 +344,135 @@ def search_insight_viz_app():
                 # 显示可视化
                 st.subheader("数据可视化")
                 if not brand_words_df.empty:
-                    fig = px.pie(brand_words_df, values='搜索量', names='品牌名称', title="品牌词拆解")
-                    fig.update_traces(textinfo='label+percent')
-                    st.plotly_chart(fig, use_container_width=True)
+                    ```chartjs
+                    {
+                        "type": "pie",
+                        "data": {
+                            "labels": brand_words_df['品牌名称'].tolist(),
+                            "datasets": [{
+                                "data": brand_words_df['搜索量'].tolist(),
+                                "backgroundColor": [
+                                    "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF",
+                                    "#FF9F40", "#FF5733", "#C70039", "#900C3F", "#581845"
+                                ]
+                            }]
+                        },
+                        "options": {
+                            "plugins": {
+                                "title": { "display": true, "text": "品牌词拆解" },
+                                "legend": { "display": true, "position": "top" },
+                                "tooltip": {
+                                    "callbacks": {
+                                        "label": function(context) {
+                                            let label = context.label || '';
+                                            let value = context.raw || 0;
+                                            let sum = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            let percentage = ((value / sum) * 100).toFixed(2) + '%';
+                                            return `${label}: ${value} (${percentage})`;
+                                        }
+                                    }
+                                },
+                                "datalabels": {
+                                    "formatter": (value, context) => {
+                                        let sum = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        let percentage = ((value / sum) * 100).toFixed(2) + '%';
+                                        return percentage;
+                                    },
+                                    "color": "#fff",
+                                    "font": { "weight": "bold" }
+                                }
+                            }
+                        }
+                    }
+                    ```
                 
                 for param_name, heats in param_heats.items():
                     if heats:
                         param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
-                        fig = px.pie(param_df, values='搜索量', names='参数值', title=f"{param_name} 参数搜索量分布")
-                        fig.update_traces(textinfo='label+percent')
-                        st.plotly_chart(fig, use_container_width=True)
+                        ```chartjs
+                        {
+                            "type": "pie",
+                            "data": {
+                                "labels": param_df['参数值'].tolist(),
+                                "datasets": [{
+                                    "data": param_df['搜索量'].tolist(),
+                                    "backgroundColor": [
+                                        "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF",
+                                        "#FF9F40", "#FF5733", "#C70039", "#900C3F", "#581845"
+                                    ]
+                                }]
+                            },
+                            "options": {
+                                "plugins": {
+                                    "title": { "display": true, "text": f"{param_name} 参数搜索量分布" },
+                                    "legend": { "display": true, "position": "top" },
+                                    "tooltip": {
+                                        "callbacks": {
+                                            "label": function(context) {
+                                                let label = context.label || '';
+                                                let value = context.raw || 0;
+                                                let sum = context.dataset.data.reduce((a, b) => a + b, 0);
+                                                let percentage = ((value / sum) * 100).toFixed(2) + '%';
+                                                return `${label}: ${value} (${percentage})`;
+                                            }
+                                        }
+                                    },
+                                    "datalabels": {
+                                        "formatter": (value, context) => {
+                                            let sum = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            let percentage = ((value / sum) * 100).toFixed(2) + '%';
+                                            return percentage;
+                                        },
+                                        "color": "#fff",
+                                        "font": { "weight": "bold" }
+                                    }
+                                }
+                            }
+                        }
+                        ```
                 
                 if not df_selected.empty:
-                    fig = px.pie(df_selected, values='搜索量', names='词性', title="流量结构")
-                    fig.update_traces(textinfo='label+percent')
-                    st.plotly_chart(fig, use_container_width=True)
+                    ```chartjs
+                    {
+                        "type": "pie",
+                        "data": {
+                            "labels": df_selected['词性'].tolist(),
+                            "datasets": [{
+                                "data": df_selected['搜索量'].tolist(),
+                                "backgroundColor": [
+                                    "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF",
+                                    "#FF9F40", "#FF5733", "#C70039", "#900C3F", "#581845"
+                                ]
+                            }]
+                        },
+                        "options": {
+                            "plugins": {
+                                "title": { "display": true, "text": "流量结构" },
+                                "legend": { "display": true, "position": "top" },
+                                "tooltip": {
+                                    "callbacks": {
+                                        "label": function(context) {
+                                            let label = context.label || '';
+                                            let value = context.raw || 0;
+                                            let sum = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            let percentage = ((value / sum) * 100).toFixed(2) + '%';
+                                            return `${label}: ${value} (${percentage})`;
+                                        }
+                                    }
+                                },
+                                "datalabels": {
+                                    "formatter": (value, context) => {
+                                        let sum = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        let percentage = ((value / sum) * 100).toFixed(2) + '%';
+                                        return percentage;
+                                    },
+                                    "color": "#fff",
+                                    "font": { "weight": "bold" }
+                                }
+                            }
+                        }
+                    }
+                    ```
                 
                 # 提供下载链接
                 st.download_button(
