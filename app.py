@@ -275,7 +275,7 @@ def pie_chart(df, value_col, name_col, title):
         df[name_col] = pd.Categorical(df[name_col], ordered=True)
 
     # 更鲜明的配色序列
-    color_sequence = px.colors.qualitative.Plotly
+    color_sequence =px.colors.qualitative.Set3
 
     fig = px.pie(
         df,
