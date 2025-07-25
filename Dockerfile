@@ -6,6 +6,10 @@ RUN echo "deb http://deb.debian.org/debian bullseye main contrib non-free" > /et
     apt-get update && \
     apt-get install -y unrar
 
+# 安装 Python 依赖（可选，Streamlit Cloud 会自动处理 requirements.txt）
+COPY requirements.txt /app/
+WORKDIR /app
+RUN pip install -r requirements.txt
+
 # 复制项目文件
 COPY . /app
-WORKDIR /app
