@@ -360,7 +360,26 @@ def search_insight_viz_app():
                     fig = px.pie(df_selected, values='搜索量', names='词性', title="流量结构")
                     fig.update_traces(textinfo='label+percent')
                     st.plotly_chart(fig, use_container_width=True)
-                
+
+                if not brand_words_df.empty:
+                    fig = px.pie(
+                    brand_words_df,
+                    values='搜索量',
+                    names='品牌名称',
+                    title="品牌词拆解")
+                fig.update_traces(
+                textinfo='percent',  # 仅显示百分比，减少标签长度
+                textposition='auto',  # 自动选择内部或外部
+                textfont=dict(size=12),  # 较小字体
+                pull=[0.05] * len(brand_words_df),  # 轻微拉伸切片
+                rotation=45  # 旋转饼图优化标签位置)
+                fig.update_layout(
+                width=800,  # 增加图表宽度
+                height=600,  # 增加图表高度
+                margin=dict(t=50, b=50, l=50, r=50),  # 调整边距
+                showlegend=True,  # 显示图例，减少对标签的依赖
+                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)  # 水平图例置于底部)
+                st.plotly_chart(fig, use_container_width=True)
                 # 提供下载链接
                 st.download_button(
                     label="下载处理结果",
