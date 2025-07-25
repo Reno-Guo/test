@@ -8,13 +8,13 @@ import zipfile
 import tempfile
 from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
+import json
 
 # 合并数据表格功能
 def merge_data_app():
     with st.expander("合并数据表格", expanded=False):
         st.header("合并数据表格")
         
-        # 修改为接受单个 .zip 文件
         uploaded_file = st.file_uploader("选择一个 .zip 文件（包含需要合并的 Excel 文件）", type=["zip"], accept_multiple_files=False, key="merge_files")
         save_filename = st.text_input("请输入合并后的文件名（例如：output.xlsx）", key="merge_save")
         
@@ -26,31 +26,24 @@ def merge_data_app():
             save_path = os.path.join("/tmp", save_filename) if not save_filename.startswith("/tmp") else save_filename
             
             try:
-                # 创建临时目录用于解压文件
                 with tempfile.TemporaryDirectory() as temp_dir:
                     df_list = []
-                    
-                    # 处理上传的压缩文件
                     file_extension = os.path.splitext(uploaded_file.name)[1].lower()
                     temp_file_path = os.path.join(temp_dir, uploaded_file.name)
                     
-                    # 将上传的文件保存到临时目录
                     with open(temp_file_path, "wb") as f:
                         f.write(uploaded_file.getbuffer())
                     
-                    # 解压 .zip 文件
                     if file_extension == '.zip':
                         with zipfile.ZipFile(temp_file_path, 'r') as zip_ref:
                             zip_ref.extractall(temp_dir)
                     
-                    # 获取解压后的所有 Excel 文件
                     excel_files = [f for f in os.listdir(temp_dir) if f.endswith(('.xlsx', '.xls', '.csv'))]
                     
                     if not excel_files:
                         st.warning("压缩文件中未找到任何 Excel 或 CSV 文件")
                         return
                     
-                    # 读取每个 Excel 文件
                     for file_name in excel_files:
                         file_path = os.path.join(temp_dir, file_name)
                         try:
@@ -112,7 +105,6 @@ def search_insight_app():
     with st.expander("搜索流量洞察", expanded=False):
         st.header("搜索流量洞察")
         
-        # 模板下载
         st.subheader("模板下载")
         template_df = pd.DataFrame(columns=["搜索词", "搜索量", "品牌名称"])
         buffer = io.BytesIO()
@@ -126,11 +118,9 @@ def search_insight_app():
             key="download_template"
         )
         
-        # 数据文件上传
         uploaded_file = st.file_uploader("选择数据文件", type=["xlsx", "xls"], key="data_file")
         save_filename = st.text_input("请输入输出文件名（例如：result.xlsx）", key="save_folder")
         
-        # 输入产品参数（可选）
         st.subheader("输入产品参数（可选）")
         param_names = st.text_input("参数名（用逗号分隔，如 颜色,尺寸，可留空）", key="param_names")
         param_values = st.text_area("具体参数（每行一个参数组，用逗号分隔，如 红,蓝\n小,大，可留空）", key="param_values")
@@ -143,13 +133,11 @@ def search_insight_app():
             save_path = os.path.join("/tmp", save_filename) if not save_filename.startswith("/tmp") else save_filename
             
             try:
-                # 读取输入数据
                 df = pd.read_excel(uploaded_file)
                 if df.empty:
                     st.warning("上传的文件为空，请检查数据文件")
                     return
                 
-                # 处理产品参数（支持中英文逗号）
                 product_parameters = []
                 if param_names and param_values:
                     param_names_list = [name.strip() for name in re.split(r'[,\uff0c]', param_names) if name.strip()]
@@ -160,7 +148,6 @@ def search_insight_app():
                             param_values_list.append(values)
                     product_parameters = list(zip(param_names_list, param_values_list)) if param_names_list and param_values_list else []
                 
-                # 初始化列
                 df['品牌'] = ''
                 df['特性参数'] = ''
                 for param_name, _ in product_parameters:
@@ -170,7 +157,6 @@ def search_insight_app():
                 brand_words_list = []
                 translator_punct = str.maketrans('', '', '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~')
                 
-                # 处理搜索词
                 for index, row in df.iterrows():
                     search_word = str(row['搜索词']).lower()
                     search_volumn = row['搜索量'] if pd.notna(row['搜索量']) else 0
@@ -210,7 +196,6 @@ def search_insight_app():
                 
                 df['词性'] = results
                 
-                # 保存到 Excel（仅源数据工作表）
                 workbook = Workbook()
                 if "Sheet" in workbook.sheetnames:
                     workbook.remove(workbook["Sheet"])
@@ -223,12 +208,10 @@ def search_insight_app():
                 output_filename = f"result_{timestamp}.xlsx"
                 output_path = os.path.join("/tmp", output_filename)
                 
-                # 保存工作簿到缓冲区以供下载
                 buffer = io.BytesIO()
                 workbook.save(buffer)
                 buffer.seek(0)
                 
-                # 提供下载链接
                 st.download_button(
                     label="下载处理结果",
                     data=buffer,
@@ -249,7 +232,6 @@ def search_insight_viz_app():
     with st.expander("搜索流量洞察可视化", expanded=False):
         st.header("搜索流量洞察可视化")
         
-        # 数据文件上传
         uploaded_file = st.file_uploader("选择包含源数据的 Excel 文件", type=["xlsx", "xls"], key="viz_data_file")
         save_filename = st.text_input("请输入输出文件名（例如：viz_result.xlsx）", key="viz_save_folder")
         
@@ -261,20 +243,17 @@ def search_insight_viz_app():
             save_path = os.path.join("/tmp", save_filename) if not save_filename.startswith("/tmp") else save_filename
             
             try:
-                # 读取源数据工作表
                 df = pd.read_excel(uploaded_file, sheet_name='源数据')
                 if df.empty:
                     st.warning("上传的文件为空或不包含‘源数据’工作表，请检查数据文件")
                     return
                 
-                # 数据聚合
                 brand_words_list = []
                 translator_punct = str.maketrans('', '', '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~')
                 
                 for index, row in df.iterrows():
                     search_word = str(row['搜索词']).lower()
                     search_volumn = row['搜索量'] if pd.notna(row['搜索量']) else 0
-                    # 处理品牌列，确保非空字符串
                     brand_value = str(row['品牌']) if not pd.isna(row['品牌']) else ''
                     matched_brands = brand_value.split(',') if brand_value else []
                     for brand in matched_brands:
@@ -292,30 +271,25 @@ def search_insight_viz_app():
                         for index, row in df.iterrows():
                             search_word = str(row['搜索词']).lower()
                             search_volumn = row['搜索量'] if pd.notna(row['搜索量']) else 0
-                            # 处理参数列，确保非空字符串
                             param_value = str(row[column]) if not pd.isna(row[column]) else ''
                             matched_values = param_value.split(',') if param_value else []
                             for param in matched_values:
                                 if param:
                                     param_heats[column].append({'参数值': param, '搜索量': search_volumn})
                 
-                # 保存到 Excel
                 workbook = Workbook()
                 if "Sheet" in workbook.sheetnames:
                     workbook.remove(workbook["Sheet"])
                 
-                # 写入源数据工作表
                 ws_source = workbook.create_sheet('源数据')
                 for r in dataframe_to_rows(df, index=False, header=True):
                     ws_source.append(r)
                 
-                # 写入品牌词拆解工作表
                 if not brand_words_df.empty:
                     ws_brands = workbook.create_sheet('品牌词拆解')
                     for r in dataframe_to_rows(brand_words_df, index=False, header=True):
                         ws_brands.append(r)
                 
-                # 写入参数拆解工作表
                 for param_name, heats in param_heats.items():
                     if heats:
                         param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
@@ -324,14 +298,12 @@ def search_insight_viz_app():
                         for r in dataframe_to_rows(param_df, index=False, header=True):
                             ws_param.append(r)
                 
-                # 写入品类流量结构工作表
                 df_selected = df[['词性', '搜索量']].groupby('词性').sum().reset_index()
                 if not df_selected.empty:
                     ws_traffic = workbook.create_sheet('品类流量结构')
                     for r in dataframe_to_rows(df_selected, index=False, header=True):
                         ws_traffic.append(r)
                 
-                # 保存工作簿到缓冲区以供下载
                 timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
                 output_filename = f"viz_result_{timestamp}.xlsx"
                 output_path = os.path.join("/tmp", output_filename)
@@ -341,140 +313,169 @@ def search_insight_viz_app():
                 workbook.save(buffer)
                 buffer.seek(0)
                 
-                # 显示可视化
                 st.subheader("数据可视化")
-                if not brand_words_df.empty:
-                    ```chartjs
-                    {
-                        "type": "pie",
-                        "data": {
-                            "labels": brand_words_df['品牌名称'].tolist(),
-                            "datasets": [{
-                                "data": brand_words_df['搜索量'].tolist(),
-                                "backgroundColor": [
-                                    "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF",
-                                    "#FF9F40", "#FF5733", "#C70039", "#900C3F", "#581845"
-                                ]
-                            }]
-                        },
-                        "options": {
-                            "plugins": {
-                                "title": { "display": true, "text": "品牌词拆解" },
-                                "legend": { "display": true, "position": "top" },
-                                "tooltip": {
-                                    "callbacks": {
-                                        "label": function(context) {
-                                            let label = context.label || '';
-                                            let value = context.raw || 0;
-                                            let sum = context.dataset.data.reduce((a, b) => a + b, 0);
-                                            let percentage = ((value / sum) * 100).toFixed(2) + '%';
-                                            return `${label}: ${value} (${percentage})`;
-                                        }
-                                    }
-                                },
-                                "datalabels": {
-                                    "formatter": (value, context) => {
-                                        let sum = context.dataset.data.reduce((a, b) => a + b, 0);
-                                        let percentage = ((value / sum) * 100).toFixed(2) + '%';
-                                        return percentage;
-                                    },
-                                    "color": "#fff",
-                                    "font": { "weight": "bold" }
-                                }
-                            }
-                        }
-                    }
-                    ```
                 
-                for param_name, heats in param_heats.items():
-                    if heats:
-                        param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
-                        ```chartjs
-                        {
-                            "type": "pie",
-                            "data": {
-                                "labels": param_df['参数值'].tolist(),
-                                "datasets": [{
-                                    "data": param_df['搜索量'].tolist(),
-                                    "backgroundColor": [
-                                        "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF",
-                                        "#FF9F40", "#FF5733", "#C70039", "#900C3F", "#581845"
-                                    ]
-                                }]
-                            },
-                            "options": {
-                                "plugins": {
-                                    "title": { "display": true, "text": f"{param_name} 参数搜索量分布" },
-                                    "legend": { "display": true, "position": "top" },
-                                    "tooltip": {
-                                        "callbacks": {
-                                            "label": function(context) {
+                # 品牌词拆解饼图
+                if not brand_words_df.empty:
+                    chart_id = f"brand_pie_{timestamp}"
+                    chart_data = {
+                        "labels": brand_words_df['品牌名称'].tolist(),
+                        "datasets": [{
+                            "data": brand_words_df['搜索量'].tolist(),
+                            "backgroundColor": [
+                                "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF",
+                                "#FF9F40", "#FF5733", "#C70039", "#900C3F", "#581845"
+                            ]
+                        }]
+                    }
+                    chart_html = f"""
+                    <canvas id="{chart_id}" width="400" height="400"></canvas>
+                    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+                    <script>
+                        var ctx = document.getElementById('{chart_id}').getContext('2d');
+                        new Chart(ctx, {{
+                            type: 'pie',
+                            data: {json.dumps(chart_data)},
+                            options: {{
+                                plugins: {{
+                                    title: {{ display: true, text: '品牌词拆解' }},
+                                    legend: {{ display: true, position: 'top' }},
+                                    tooltip: {{
+                                        callbacks: {{
+                                            label: function(context) {{
                                                 let label = context.label || '';
                                                 let value = context.raw || 0;
                                                 let sum = context.dataset.data.reduce((a, b) => a + b, 0);
                                                 let percentage = ((value / sum) * 100).toFixed(2) + '%';
-                                                return `${label}: ${value} (${percentage})`;
-                                            }
-                                        }
-                                    },
-                                    "datalabels": {
-                                        "formatter": (value, context) => {
+                                                return `${{label}}: ${{value}} (${{percentage}})`;
+                                            }}
+                                        }}
+                                    }},
+                                    datalabels: {{
+                                        formatter: (value, context) => {{
                                             let sum = context.dataset.data.reduce((a, b) => a + b, 0);
                                             let percentage = ((value / sum) * 100).toFixed(2) + '%';
                                             return percentage;
-                                        },
-                                        "color": "#fff",
-                                        "font": { "weight": "bold" }
-                                    }
-                                }
-                            }
-                        }
-                        ```
+                                        }},
+                                        color: '#fff',
+                                        font: {{ weight: 'bold' }}
+                                    }}
+                                }}
+                            }}
+                        }});
+                    </script>
+                    """
+                    st.markdown(chart_html, unsafe_allow_html=True)
                 
-                if not df_selected.empty:
-                    ```chartjs
-                    {
-                        "type": "pie",
-                        "data": {
-                            "labels": df_selected['词性'].tolist(),
+                # 参数拆解饼图
+                for param_name, heats in param_heats.items():
+                    if heats:
+                        param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
+                        chart_id = f"param_pie_{param_name}_{timestamp}"
+                        chart_data = {
+                            "labels": param_df['参数值'].tolist(),
                             "datasets": [{
-                                "data": df_selected['搜索量'].tolist(),
+                                "data": param_df['搜索量'].tolist(),
                                 "backgroundColor": [
                                     "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF",
                                     "#FF9F40", "#FF5733", "#C70039", "#900C3F", "#581845"
                                 ]
                             }]
-                        },
-                        "options": {
-                            "plugins": {
-                                "title": { "display": true, "text": "流量结构" },
-                                "legend": { "display": true, "position": "top" },
-                                "tooltip": {
-                                    "callbacks": {
-                                        "label": function(context) {
-                                            let label = context.label || '';
-                                            let value = context.raw || 0;
+                        }
+                        chart_html = f"""
+                        <canvas id="{chart_id}" width="400" height="400"></canvas>
+                        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                        <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+                        <script>
+                            var ctx = document.getElementById('{chart_id}').getContext('2d');
+                            new Chart(ctx, {{
+                                type: 'pie',
+                                data: {json.dumps(chart_data)},
+                                options: {{
+                                    plugins: {{
+                                        title: {{ display: true, text: '{param_name} 参数搜索量分布' }},
+                                        legend: {{ display: true, position: 'top' }},
+                                        tooltip: {{
+                                            callbacks: {{
+                                                label: function(context) {{
+                                                    let label = context.label || '';
+                                                    let value = context.raw || 0;
+                                                    let sum = context.dataset.data.reduce((a, b) => a + b, 0);
+                                                    let percentage = ((value / sum) * 100).toFixed(2) + '%';
+                                                    return `${{label}}: ${{value}} (${{percentage}})`;
+                                                }}
+                                            }}
+                                        }},
+                                        datalabels: {{
+                                            formatter: (value, context) => {{
+                                                let sum = context.dataset.data.reduce((a, b) => a + b, 0);
+                                                let percentage = ((value / sum) * 100).toFixed(2) + '%';
+                                                return percentage;
+                                            }},
+                                            color: '#fff',
+                                            font: {{ weight: 'bold' }}
+                                        }}
+                                    }}
+                                }}
+                            }});
+                        </script>
+                        """
+                        st.markdown(chart_html, unsafe_allow_html=True)
+                
+                # 品类流量结构饼图
+                if not df_selected.empty:
+                    chart_id = f"traffic_pie_{timestamp}"
+                    chart_data = {
+                        "labels": df_selected['词性'].tolist(),
+                        "datasets": [{
+                            "data": df_selected['搜索量'].tolist(),
+                            "backgroundColor": [
+                                "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF",
+                                "#FF9F40", "#FF5733", "#C70039", "#900C3F", "#581845"
+                            ]
+                        }]
+                    }
+                    chart_html = f"""
+                    <canvas id="{chart_id}" width="400" height="400"></canvas>
+                    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+                    <script>
+                        var ctx = document.getElementById('{chart_id}').getContext('2d');
+                        new Chart(ctx, {{
+                            type: 'pie',
+                            data: {json.dumps(chart_data)},
+                            options: {{
+                                plugins: {{
+                                    title: {{ display: true, text: '流量结构' }},
+                                    legend: {{ display: true, position: 'top' }},
+                                    tooltip: {{
+                                        callbacks: {{
+                                            label: function(context) {{
+                                                let label = context.label || '';
+                                                let value = context.raw || 0;
+                                                let sum = context.dataset.data.reduce((a, b) => a + b, 0);
+                                                let percentage = ((value / sum) * 100).toFixed(2) + '%';
+                                                return `${{label}}: ${{value}} (${{percentage}})`;
+                                            }}
+                                        }}
+                                    }},
+                                    datalabels: {{
+                                        formatter: (value, context) => {{
                                             let sum = context.dataset.data.reduce((a, b) => a + b, 0);
                                             let percentage = ((value / sum) * 100).toFixed(2) + '%';
-                                            return `${label}: ${value} (${percentage})`;
-                                        }
-                                    }
-                                },
-                                "datalabels": {
-                                    "formatter": (value, context) => {
-                                        let sum = context.dataset.data.reduce((a, b) => a + b, 0);
-                                        let percentage = ((value / sum) * 100).toFixed(2) + '%';
-                                        return percentage;
-                                    },
-                                    "color": "#fff",
-                                    "font": { "weight": "bold" }
-                                }
-                            }
-                        }
-                    }
-                    ```
+                                            return percentage;
+                                        }},
+                                        color: '#fff',
+                                        font: {{ weight: 'bold' }}
+                                    }}
+                                }}
+                            }}
+                        }});
+                    </script>
+                    """
+                    st.markdown(chart_html, unsafe_allow_html=True)
                 
-                # 提供下载链接
                 st.download_button(
                     label="下载处理结果",
                     data=buffer,
