@@ -288,7 +288,7 @@ def pie_chart(df, value_col, name_col, title):
     fig.update_traces(textinfo='label+percent', sort=False)
 
     fig.update_layout(
-        height=750,
+        height=900,
         legend=dict(
             orientation="h",
             x=0.5,
