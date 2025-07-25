@@ -16,13 +16,13 @@ import tempfile
 def merge_data_app():
     st.header("合并数据表格")
     
-    # 修改为接受单个 .rar 或 .zip 文件
-    uploaded_file = st.file_uploader("选择一个 .rar 或 .zip 文件（包含需要合并的 Excel 文件）", type=["rar", "zip"], accept_multiple_files=False, key="merge_files")
+    # 修改为接受单个 .zip 文件
+    uploaded_file = st.file_uploader("选择一个 .zip 文件（包含需要合并的 Excel 文件）", type=["zip"], accept_multiple_files=False, key="merge_files")
     save_filename = st.text_input("请输入合并后的文件名（例如：output.xlsx）", key="merge_save")
     
     if st.button("合并文件", key="merge_button"):
         if not uploaded_file or not save_filename:
-            st.warning("请确保已选择 .rar 或 .zip 文件并输入文件名")
+            st.warning("请确保已选择 .zip 文件并输入文件名")
             return
         
         save_path = os.path.join("/tmp", save_filename) if not save_filename.startswith("/tmp") else save_filename
@@ -40,13 +40,10 @@ def merge_data_app():
                 with open(temp_file_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
                 
-                # 解压 .zip 或 .rar 文件
+                # 解压 .zip 文件
                 if file_extension == '.zip':
                     with zipfile.ZipFile(temp_file_path, 'r') as zip_ref:
                         zip_ref.extractall(temp_dir)
-                elif file_extension == '.rar':
-                    with rarfile.RarFile(temp_file_path, 'r') as rar_ref:
-                        rar_ref.extractall(temp_dir)
                 
                 # 获取解压后的所有 Excel 文件
                 excel_files = [f for f in os.listdir(temp_dir) if f.endswith(('.xlsx', '.xls', '.csv'))]
