@@ -275,7 +275,9 @@ def search_insight_viz_app():
                 for index, row in df.iterrows():
                     search_word = str(row['搜索词']).lower()
                     search_volumn = row['搜索量'] if pd.notna(row['搜索量']) else 0
-                    matched_brands = row['品牌'].split(',') if row['品牌'] else []
+                    # 处理品牌列，确保非空字符串
+                    brand_value = str(row['品牌']) if not pd.isna(row['品牌']) else ''
+                    matched_brands = brand_value.split(',') if brand_value else []
                     for brand in matched_brands:
                         if brand:
                             brand_words_list.append({'品牌名称': brand, '搜索量': search_volumn})
@@ -291,7 +293,9 @@ def search_insight_viz_app():
                         for index, row in df.iterrows():
                             search_word = str(row['搜索词']).lower()
                             search_volumn = row['搜索量'] if pd.notna(row['搜索量']) else 0
-                            matched_values = row[column].split(',') if row[column] else []
+                            # 处理参数列，确保非空字符串
+                            param_value = str(row[column]) if not pd.isna(row[column]) else ''
+                            matched_values = param_value.split(',') if param_value else []
                             for param in matched_values:
                                 if param:
                                     param_heats[column].append({'参数值': param, '搜索量': search_volumn})
