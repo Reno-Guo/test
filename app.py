@@ -152,9 +152,14 @@ def search_insight_app():
                 # 处理产品参数（仅在提供参数时处理）
                 product_parameters = []
                 if param_names and param_values:
-                    param_names_list = [name.strip() for name in param_names.split(',')]
-                    param_values_list = [v.strip().split(',') for v in param_values.split('\n')]
-                    product_parameters = list(zip(param_names_list, param_values_list))
+                    # 支持中英文逗号
+                    param_names_list = [name.strip() for name in re.split(r'[,\uff0c]', param_names) if name.strip()]
+                    param_values_list = []
+                    for v in param_values.split('\n'):
+                        values = [val.strip() for val in re.split(r'[,\uff0c]', v) if val.strip()]
+                        if values:
+                            param_values_list.append(values)
+                    product_parameters = list(zip(param_names_list, param_values_list)) if param_names_list and param_values_list else []
                 
                 # 初始化列
                 df['品牌'] = ''
