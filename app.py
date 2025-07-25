@@ -273,9 +273,20 @@ def pie_chart(df, value_col, name_col, title):
         df[name_col] = pd.Categorical(df[name_col], categories=categories, ordered=True)
     else:
         df[name_col] = pd.Categorical(df[name_col], ordered=True)
-
-    # 更鲜明的配色序列
-    color_sequence =px.colors.qualitative.Set3
+    
+    business_palette = [
+    "#4E79A7",  # 深蓝
+    "#F28E2B",  # 商务橙
+    "#E15759",  # 砖红
+    "#76B7B2",  # 青灰
+    "#59A14F",  # 绿松
+    "#EDC948",  # 金黄
+    "#B07AA1",  # 紫灰
+    "#FF9DA7",  # 粉红
+    "#9C755F",  # 咖啡棕
+    "#BAB0AC",  # 灰褐
+    "#86BCB6",  # 绿灰蓝
+]
 
     fig = px.pie(
         df,
@@ -283,7 +294,7 @@ def pie_chart(df, value_col, name_col, title):
         names=name_col,
         title=title,
         category_orders={name_col: df[name_col].cat.categories.tolist()},
-        color_discrete_sequence=color_sequence
+        color_discrete_sequence=business_palette
     )
     fig.update_traces(textinfo='label+percent', sort=False)
 
