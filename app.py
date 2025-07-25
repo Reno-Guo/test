@@ -8,8 +8,7 @@ import zipfile
 import tempfile
 from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
-import matplotlib.pyplot as plt
-from adjustText import adjust_text
+import plotly.express as px
 
 # 合并数据表格功能
 def merge_data_app():
@@ -343,76 +342,24 @@ def search_insight_viz_app():
                 workbook.save(buffer)
                 buffer.seek(0)
                 
-                # 显示可视化（使用 Matplotlib 和 adjustText）
+                # 显示可视化
                 st.subheader("数据可视化")
-                
-                # 饼图 1：品牌词拆解
                 if not brand_words_df.empty:
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    wedges, texts, autotexts = ax.pie(
-                        brand_words_df['搜索量'],
-                        labels=brand_words_df['品牌名称'],
-                        autopct='%1.1f%%',  # 显示百分比
-                        startangle=45,  # 旋转饼图
-                        explode=[0.05] * len(brand_words_df),  # 轻微拉伸切片
-                        textprops=dict(size=10)  # 较小字体
-                    )
-                    texts_to_adjust = [text for text in texts]
-                    adjust_text(
-                        texts_to_adjust,
-                        arrowprops=dict(arrowstyle='->', color='gray', lw=0.5),
-                        expand_points=(1.2, 1.5),
-                        force_text=0.5,
-                        force_points=0.5
-                    )
-                    ax.set_title("品牌词拆解")
-                    st.pyplot(fig)
+                    fig = px.pie(brand_words_df, values='搜索量', names='品牌名称', title="品牌词拆解")
+                    fig.update_traces(textinfo='label+percent')
+                    st.plotly_chart(fig, use_container_width=True)
                 
-                # 饼图 2：参数搜索量分布
                 for param_name, heats in param_heats.items():
                     if heats:
                         param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
-                        fig, ax = plt.subplots(figsize=(10, 6))
-                        wedges, texts, autotexts = ax.pie(
-                            param_df['搜索量'],
-                            labels=param_df['参数值'],
-                            autopct='%1.1f%%',
-                            startangle=45,
-                            explode=[0.05] * len(param_df),
-                            textprops=dict(size=10)
-                        )
-                        texts_to_adjust = [text for text in texts]
-                        adjust_text(
-                            texts_to_adjust,
-                            arrowprops=dict(arrowstyle='->', color='gray', lw=0.5),
-                            expand_points=(1.2, 1.5),
-                            force_text=0.5,
-                            force_points=0.5
-                        )
-                        ax.set_title(f"{param_name} 参数搜索量分布")
-                        st.pyplot(fig)
+                        fig = px.pie(param_df, values='搜索量', names='参数值', title=f"{param_name} 参数搜索量分布")
+                        fig.update_traces(textinfo='label+percent')
+                        st.plotly_chart(fig, use_container_width=True)
                 
-                # 饼图 3：流量结构
                 if not df_selected.empty:
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    wedges, texts, autotexts = ax.pie(
-                        df_selected['搜索量'],
-                        labels=df_selected['词性'],
-                        autopct='%1.1f%%',
-                        startangle=45,
-                        explode=[0.05] * len(df_selected),
-                        textprops=dict(size=10)
-                    )
-                    texts_to_adjust = [text for text in texts]
-                    adjust_text(
-                        texts_to_adjust,
-                        arrowprops=dict(arrowstyle='->', color='gray', lw=0.5),
-                        expand_points=(1.2, 1.5),
-                        force_text=0.5,
-                        force_points=0.5
-                    )
-                    ax.set_title("流量结构")
-                    st.pyplot(fig)
+                    fig = px.pie(df_selected, values='搜索量', names='词性', title="流量结构")
+                    fig.update_traces(textinfo='label+percent')
+                    st.plotly_chart(fig, use_container_width=True)
                 
                 # 提供下载链接
                 st.download_button(
