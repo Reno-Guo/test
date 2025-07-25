@@ -8,60 +8,92 @@ import plotly.express as px
 from openpyxl import Workbook
 from openpyxl.chart import PieChart, Reference
 from openpyxl.chart.label import DataLabelList
+import zipfile
+import rarfile
+import tempfile
 
 # 合并数据表格功能
 def merge_data_app():
     st.header("合并数据表格")
     
-    uploaded_files = st.file_uploader("选择需要合并的 Excel 文件", type=["xlsx", "xls", "csv"], accept_multiple_files=True, key="merge_files")
+    # 修改为接受单个 .rar 或 .zip 文件
+    uploaded_file = st.file_uploader("选择一个 .rar 或 .zip 文件（包含需要合并的 Excel 文件）", type=["rar", "zip"], accept_multiple_files=False, key="merge_files")
     save_filename = st.text_input("请输入合并后的文件名（例如：output.xlsx）", key="merge_save")
     
     if st.button("合并文件", key="merge_button"):
-        if not uploaded_files or not save_filename:
-            st.warning("请确保已选择文件并输入文件名")
+        if not uploaded_file or not save_filename:
+            st.warning("请确保已选择 .rar 或 .zip 文件并输入文件名")
             return
         
         save_path = os.path.join("/tmp", save_filename) if not save_filename.startswith("/tmp") else save_filename
         
         try:
-            df_list = []
-            for file in uploaded_files:
-                try:
-                    if file.name.endswith('.xlsx'):
-                        df = pd.read_excel(file, engine='openpyxl')
-                    elif file.name.endswith('.xls'):
-                        df = pd.read_excel(file, engine='xlrd')
-                    elif file.name.endswith('.csv'):
-                        df = pd.read_csv(file)
-                    df['时间'] = os.path.splitext(file.name)[0]
-                    df = process_price_columns(df)
-                    df_list.append(df)
-                except Exception as e:
-                    st.error(f"读取文件 {file.name} 失败：{e}")
-                    continue
-            
-            if df_list:
-                merged_df = pd.concat(df_list, ignore_index=True)
-                merged_df = merged_df.loc[:, ~merged_df.columns.duplicated()]
+            # 创建临时目录用于解压文件
+            with tempfile.TemporaryDirectory() as temp_dir:
+                df_list = []
                 
-                buffer = io.BytesIO()
-                merged_df.to_excel(buffer, index=False, engine='openpyxl')
-                buffer.seek(0)
-                st.download_button(
-                    label="下载合并后的文件",
-                    data=buffer,
-                    file_name=os.path.basename(save_filename),
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="download_merged"
-                )
-                st.success(f"表格已成功合并，可通过下载按钮获取文件")
-                if st.checkbox("保存到 /tmp 目录", key="save_merged"):
-                    merged_df.to_excel(save_path, index=False, engine='openpyxl')
-                    st.success(f"文件已保存到 {save_path}")
-            else:
-                st.warning("没有可合并的数据")
+                # 处理上传的压缩文件
+                file_extension = os.path.splitext(uploaded_file.name)[1].lower()
+                temp_file_path = os.path.join(temp_dir, uploaded_file.name)
+                
+                # 将上传的文件保存到临时目录
+                with open(temp_file_path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+                
+                # 解压 .zip 或 .rar 文件
+                if file_extension == '.zip':
+                    with zipfile.ZipFile(temp_file_path, 'r') as zip_ref:
+                        zip_ref.extractall(temp_dir)
+                elif file_extension == '.rar':
+                    with rarfile.RarFile(temp_file_path, 'r') as rar_ref:
+                        rar_ref.extractall(temp_dir)
+                
+                # 获取解压后的所有 Excel 文件
+                excel_files = [f for f in os.listdir(temp_dir) if f.endswith(('.xlsx', '.xls', '.csv'))]
+                
+                if not excel_files:
+                    st.warning("压缩文件中未找到任何 Excel 或 CSV 文件")
+                    return
+                
+                # 读取每个 Excel 文件
+                for file_name in excel_files:
+                    file_path = os.path.join(temp_dir, file_name)
+                    try:
+                        if file_name.endswith('.xlsx'):
+                            df = pd.read_excel(file_path, engine='openpyxl')
+                        elif file_name.endswith('.xls'):
+                            df = pd.read_excel(file_path, engine='xlrd')
+                        elif file_name.endswith('.csv'):
+                            df = pd.read_csv(file_path)
+                        df['时间'] = os.path.splitext(file_name)[0]
+                        df = process_price_columns(df)
+                        df_list.append(df)
+                    except Exception as e:
+                        st.error(f"读取文件 {file_name} 失败：{e}")
+                        continue
+                
+                if df_list:
+                    merged_df = pd.concat(df_list, ignore_index=True)
+                    merged_df = merged_df.loc[:, ~merged_df.columns.duplicated()]
+                    
+                    buffer = io.BytesIO()
+                    merged_df.to_excel(buffer, index=False, engine='openpyxl')
+                    buffer.seek(0)
+                    st.download_button(
+                        label="下载合并后的文件",
+                        data=buffer,
+                        file_name=os.path.basename(save_filename),
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="download_merged"
+                    )
+                    st.success(f"表格已成功合并，可通过下载按钮获取文件")
+                    if st.checkbox("保存到 /tmp 目录", key="save_merged"):
+                        merged_df.to_excel(save_path, index=False, engine='openpyxl')
+                        st.success(f"文件已保存到 {save_path}")
+                else:
+                    st.warning("没有可合并的数据")
         except Exception as e:
-            st.error(f"合并文件时发生错误：{e}")
+            st.error(f"处理压缩文件或合并文件时发生错误：{e}")
 
 # 处理价格列
 def process_price_columns(df):
