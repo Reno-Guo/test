@@ -6,7 +6,7 @@ from datetime import datetime
 import io
 import zipfile
 import tempfile
-from openpyxl import Workbook
+from openpyxl import Workbook  # 添加 Workbook 导入
 
 # 合并数据表格功能
 def merge_data_app():
@@ -142,7 +142,7 @@ def search_insight_app():
             save_path = os.path.join("/tmp", save_filename) if not save_filename.startswith("/tmp") else save_filename
             
             try:
-                # Read input data
+                # 读取输入数据
                 df = pd.read_excel(uploaded_file)
                 if df.empty:
                     st.warning("上传的文件为空，请检查数据文件")
@@ -155,7 +155,7 @@ def search_insight_app():
                     param_values_list = [v.strip().split(',') for v in param_values.split('\n')]
                     product_parameters = list(zip(param_names_list, param_values_list))
                 
-                # Initialize columns
+                # 初始化列
                 df['品牌'] = ''
                 df['特性参数'] = ''
                 for param_name, _ in product_parameters:
@@ -165,7 +165,7 @@ def search_insight_app():
                 brand_words_list = []
                 translator_punct = str.maketrans('', '', '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~')
                 
-                # Process search terms
+                # 处理搜索词
                 for index, row in df.iterrows():
                     search_word = str(row['搜索词']).lower()
                     search_volumn = row['搜索量'] if pd.notna(row['搜索量']) else 0
@@ -221,39 +221,39 @@ def search_insight_app():
                 output_filename = f"result_{timestamp}.xlsx"
                 output_path = os.path.join("/tmp", output_filename)
                 
-                # Save to Excel
+                # 保存到 Excel
                 workbook = Workbook()
-                # Remove default sheet
+                # 移除默认工作表
                 if "Sheet" in workbook.sheetnames:
                     workbook.remove(workbook["Sheet"])
                 
-                # Always create the source data sheet
+                # 始终创建源数据工作表
                 df.to_excel(output_path, sheet_name='源数据', index=False, engine='openpyxl')
                 
                 with pd.ExcelWriter(output_path, engine='openpyxl', mode='a') as writer:
                     writer.book = workbook
-                    # Write brand words data if not empty
+                    # 如果品牌词数据不为空，写入品牌词拆解
                     if not brand_words_df.empty:
                         brand_words_df.to_excel(writer, sheet_name='品牌词拆解', index=False)
                     
-                    # Write parameter data if any
+                    # 如果有参数数据，写入参数拆解
                     for param_name, heats in param_heats.items():
                         if heats:
                             param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
                             clean_sheet_name = param_name[:31].translate(str.maketrans('', '', '\/?*[]'))
                             param_df.to_excel(writer, sheet_name=f"{clean_sheet_name}拆解", index=False)
                     
-                    # Write traffic structure data if not empty
+                    # 如果流量结构数据不为空，写入品类流量结构
                     df_selected = df[['词性', '搜索量']].groupby('词性').sum().reset_index()
                     if not df_selected.empty:
                         df_selected.to_excel(writer, sheet_name='品类流量结构', index=False)
                 
-                # Save workbook to buffer for download
+                # 保存工作簿到缓冲区以供下载
                 buffer = io.BytesIO()
                 workbook.save(buffer)
                 buffer.seek(0)
                 
-                # Provide download link
+                # 提供下载链接
                 st.download_button(
                     label="下载处理结果",
                     data=buffer,
