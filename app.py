@@ -8,6 +8,7 @@ import zipfile
 import tempfile
 from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
+import plotly.express as px
 
 # 合并数据表格功能
 def merge_data_app():
@@ -107,7 +108,7 @@ def process_price_columns(df):
         df[column] = df[column].apply(extract_price)
     return df
 
-# 搜索流量洞察功能
+# 搜索流量洞察功能（仅生成源数据工作表）
 def search_insight_app():
     with st.expander("搜索流量洞察", expanded=False):
         st.header("搜索流量洞察")
@@ -149,10 +150,9 @@ def search_insight_app():
                     st.warning("上传的文件为空，请检查数据文件")
                     return
                 
-                # 处理产品参数（仅在提供参数时处理）
+                # 处理产品参数（支持中英文逗号）
                 product_parameters = []
                 if param_names and param_values:
-                    # 支持中英文逗号
                     param_names_list = [name.strip() for name in re.split(r'[,\uff0c]', param_names) if name.strip()]
                     param_values_list = []
                     for v in param_values.split('\n'):
@@ -209,56 +209,20 @@ def search_insight_app():
                     else:
                         results.append('Non-Branded KWs')
                 
-                brand_words_df = pd.DataFrame(brand_words_list)
-                if not brand_words_df.empty:
-                    brand_words_df = brand_words_df.groupby('品牌名称', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
                 df['词性'] = results
                 
-                param_heats = {param_name: [] for param_name, _ in product_parameters}
-                for index, row in df.iterrows():
-                    search_word = str(row['搜索词']).lower()
-                    search_volumn = row['搜索量']
-                    for param_name, param_values in product_parameters:
-                        for param in param_values:
-                            if str(param).lower() in search_word:
-                                param_heats[param_name].append({'参数值': param, '搜索量': search_volumn})
-                
-                timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-                output_filename = f"result_{timestamp}.xlsx"
-                output_path = os.path.join("/tmp", output_filename)
-                
-                # 保存到 Excel
+                # 保存到 Excel（仅源数据工作表）
                 workbook = Workbook()
-                # 移除默认工作表
                 if "Sheet" in workbook.sheetnames:
                     workbook.remove(workbook["Sheet"])
                 
-                # 创建源数据工作表
                 ws_source = workbook.create_sheet('源数据')
                 for r in dataframe_to_rows(df, index=False, header=True):
                     ws_source.append(r)
                 
-                # 创建品牌词拆解工作表（如果不为空）
-                if not brand_words_df.empty:
-                    ws_brands = workbook.create_sheet('品牌词拆解')
-                    for r in dataframe_to_rows(brand_words_df, index=False, header=True):
-                        ws_brands.append(r)
-                
-                # 创建参数拆解工作表（如果有参数数据）
-                for param_name, heats in param_heats.items():
-                    if heats:
-                        param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
-                        clean_sheet_name = param_name[:31].translate(str.maketrans('', '', '\/?*[]'))
-                        ws_param = workbook.create_sheet(f"{clean_sheet_name}拆解")
-                        for r in dataframe_to_rows(param_df, index=False, header=True):
-                            ws_param.append(r)
-                
-                # 创建品类流量结构工作表（如果不为空）
-                df_selected = df[['词性', '搜索量']].groupby('词性').sum().reset_index()
-                if not df_selected.empty:
-                    ws_traffic = workbook.create_sheet('品类流量结构')
-                    for r in dataframe_to_rows(df_selected, index=False, header=True):
-                        ws_traffic.append(r)
+                timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+                output_filename = f"result_{timestamp}.xlsx"
+                output_path = os.path.join("/tmp", output_filename)
                 
                 # 保存工作簿到缓冲区以供下载
                 buffer = io.BytesIO()
@@ -281,6 +245,134 @@ def search_insight_app():
             except Exception as e:
                 st.error(f"处理数据时发生错误：{e}")
 
+# 搜索流量洞察可视化功能
+def search_insight_viz_app():
+    with st.expander("搜索流量洞察可视化", expanded=False):
+        st.header("搜索流量洞察可视化")
+        
+        # 数据文件上传
+        uploaded_file = st.file_uploader("选择包含源数据的 Excel 文件", type=["xlsx", "xls"], key="viz_data_file")
+        save_filename = st.text_input("请输入输出文件名（例如：viz_result.xlsx）", key="viz_save_folder")
+        
+        if st.button("执行可视化", key="viz_execute_button"):
+            if not uploaded_file or not save_filename:
+                st.warning("请确保已上传数据文件并输入输出文件名")
+                return
+            
+            save_path = os.path.join("/tmp", save_filename) if not save_filename.startswith("/tmp") else save_filename
+            
+            try:
+                # 读取源数据工作表
+                df = pd.read_excel(uploaded_file, sheet_name='源数据')
+                if df.empty:
+                    st.warning("上传的文件为空或不包含‘源数据’工作表，请检查数据文件")
+                    return
+                
+                # 数据聚合
+                brand_words_list = []
+                translator_punct = str.maketrans('', '', '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~')
+                
+                for index, row in df.iterrows():
+                    search_word = str(row['搜索词']).lower()
+                    search_volumn = row['搜索量'] if pd.notna(row['搜索量']) else 0
+                    matched_brands = row['品牌'].split(',') if row['品牌'] else []
+                    for brand in matched_brands:
+                        if brand:
+                            brand_words_list.append({'品牌名称': brand, '搜索量': search_volumn})
+                
+                brand_words_df = pd.DataFrame(brand_words_list)
+                if not brand_words_df.empty:
+                    brand_words_df = brand_words_df.groupby('品牌名称', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
+                
+                param_heats = {}
+                for column in df.columns:
+                    if column not in ['搜索词', '搜索量', '品牌名称', '品牌', '特性参数', '词性']:
+                        param_heats[column] = []
+                        for index, row in df.iterrows():
+                            search_word = str(row['搜索词']).lower()
+                            search_volumn = row['搜索量'] if pd.notna(row['搜索量']) else 0
+                            matched_values = row[column].split(',') if row[column] else []
+                            for param in matched_values:
+                                if param:
+                                    param_heats[column].append({'参数值': param, '搜索量': search_volumn})
+                
+                # 保存到 Excel
+                workbook = Workbook()
+                if "Sheet" in workbook.sheetnames:
+                    workbook.remove(workbook["Sheet"])
+                
+                # 写入源数据工作表
+                ws_source = workbook.create_sheet('源数据')
+                for r in dataframe_to_rows(df, index=False, header=True):
+                    ws_source.append(r)
+                
+                # 写入品牌词拆解工作表
+                if not brand_words_df.empty:
+                    ws_brands = workbook.create_sheet('品牌词拆解')
+                    for r in dataframe_to_rows(brand_words_df, index=False, header=True):
+                        ws_brands.append(r)
+                
+                # 写入参数拆解工作表
+                for param_name, heats in param_heats.items():
+                    if heats:
+                        param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
+                        clean_sheet_name = param_name[:31].translate(str.maketrans('', '', '\/?*[]'))
+                        ws_param = workbook.create_sheet(f"{clean_sheet_name}拆解")
+                        for r in dataframe_to_rows(param_df, index=False, header=True):
+                            ws_param.append(r)
+                
+                # 写入品类流量结构工作表
+                df_selected = df[['词性', '搜索量']].groupby('词性').sum().reset_index()
+                if not df_selected.empty:
+                    ws_traffic = workbook.create_sheet('品类流量结构')
+                    for r in dataframe_to_rows(df_selected, index=False, header=True):
+                        ws_traffic.append(r)
+                
+                # 保存工作簿到缓冲区以供下载
+                timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+                output_filename = f"viz_result_{timestamp}.xlsx"
+                output_path = os.path.join("/tmp", output_filename)
+                workbook.save(output_path)
+                
+                buffer = io.BytesIO()
+                workbook.save(buffer)
+                buffer.seek(0)
+                
+                # 显示可视化
+                st.subheader("数据可视化")
+                if not brand_words_df.empty:
+                    fig = px.pie(brand_words_df, values='搜索量', names='品牌名称', title="品牌词拆解")
+                    fig.update_traces(textinfo='label+percent')
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                for param_name, heats in param_heats.items():
+                    if heats:
+                        param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
+                        fig = px.pie(param_df, values='搜索量', names='参数值', title=f"{param_name} 参数搜索量分布")
+                        fig.update_traces(textinfo='label+percent')
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                if not df_selected.empty:
+                    fig = px.pie(df_selected, values='搜索量', names='词性', title="流量结构")
+                    fig.update_traces(textinfo='label+percent')
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # 提供下载链接
+                st.download_button(
+                    label="下载处理结果",
+                    data=buffer,
+                    file_name=output_filename,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="viz_download_result"
+                )
+                st.success(f"数据处理和可视化完成，可通过下载按钮获取文件")
+                if st.checkbox("保存到 /tmp 目录", key="viz_save_result"):
+                    workbook.save(output_path)
+                    st.success(f"文件已保存到 {output_path}")
+            
+            except Exception as e:
+                st.error(f"处理数据时发生错误：{e}")
+
 # 主应用程序
 def main():
     st.set_page_config(page_title="市场洞察小程序", layout="wide")
@@ -291,6 +383,7 @@ def main():
     
     merge_data_app()
     search_insight_app()
+    search_insight_viz_app()
 
 if __name__ == "__main__":
     main()
