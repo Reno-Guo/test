@@ -12,7 +12,7 @@ import plotly.express as px
 
 # 合并数据表格功能
 def merge_data_app():
-    with st.expander("合并数据表格", expanded=False):
+    with st.expander("MI-合并数据表格", expanded=False):
         st.header("合并数据表格")
         
         # 修改为接受单个 .zip 文件
@@ -110,7 +110,7 @@ def process_price_columns(df):
 
 # 搜索流量洞察功能（仅生成源数据工作表）
 def search_insight_app():
-    with st.expander("搜索流量洞察", expanded=False):
+    with st.expander("SI-搜索流量洞察", expanded=False):
         st.header("搜索流量洞察")
         
         # 模板下载
@@ -313,7 +313,7 @@ def pie_chart(df, value_col, name_col, title):
     st.plotly_chart(fig, use_container_width=True)
 
 def search_insight_viz_app():
-    with st.expander("搜索流量洞察：聚合和可视化", expanded=False):
+    with st.expander("SI-搜索流量洞察：聚合和可视化", expanded=False):
         st.header("搜索流量洞察：聚合和可视化")
 
         uploaded_file = st.file_uploader("选择包含源数据的 Excel 文件(完成检查确认无误)", type=["xlsx", "xls"], key="viz_data_file")
