@@ -274,19 +274,31 @@ def pie_chart(df, value_col, name_col, title):
     else:
         df[name_col] = pd.Categorical(df[name_col], ordered=True)
 
+    # 更鲜明的配色序列
+    color_sequence = px.colors.qualitative.Set3
+
     fig = px.pie(
         df,
         values=value_col,
         names=name_col,
         title=title,
-        category_orders={name_col: df[name_col].cat.categories.tolist()}
+        category_orders={name_col: df[name_col].cat.categories.tolist()},
+        color_discrete_sequence=color_sequence
     )
     fig.update_traces(textinfo='label+percent', sort=False)
+
     fig.update_layout(
         height=900,
-        legend=dict(orientation="v", x=1, y=0.5),
-        margin=dict(l=20, r=150, t=50, b=50)
+        legend=dict(
+            orientation="v",
+            x=1,
+            y=0.5,
+            font=dict(size=14)
+        ),
+        margin=dict(l=20, r=150, t=50, b=50),
+        font=dict(size=16)  # 全局字体，包括饼图标签
     )
+
     st.plotly_chart(fig, use_container_width=True)
 
 def search_insight_viz_app():
