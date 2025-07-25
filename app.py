@@ -275,17 +275,17 @@ def pie_chart(df, value_col, name_col, title):
         df[name_col] = pd.Categorical(df[name_col], ordered=True)
     
     business_palette = [
-    "#4E79A7",  # 深蓝
-    "#F28E2B",  # 商务橙
-    "#E15759",  # 砖红
-    "#76B7B2",  # 青灰
-    "#59A14F",  # 绿松
-    "#EDC948",  # 金黄
-    "#B07AA1",  # 紫灰
-    "#FF9DA7",  # 粉红
-    "#9C755F",  # 咖啡棕
-    "#BAB0AC",  # 灰褐
-    "#86BCB6",  # 绿灰蓝
+    "#4C8EDA",  # 明亮企业蓝
+    "#FFA14E",  # 活力商务橙
+    "#F25C5C",  # 鲜红但不刺眼
+    "#6BD0C1",  # 清新青绿
+    "#58C27D",  # 明亮草绿
+    "#F7C948",  # 金亮黄
+    "#B685D6",  # 浅亮紫
+    "#FF90B3",  # 高级粉红
+    "#BC8D6E",  # 奶咖棕
+    "#C9C9C9",  # 亮灰
+    "#81D3EB",  # 天蓝
 ]
 
     fig = px.pie(
