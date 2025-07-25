@@ -1,9 +1,8 @@
 FROM streamlit/streamlit:latest
 
-# 启用 multiverse 存储库并安装 unrar
-RUN apt-get update && \
-    apt-get install -y software-properties-common && \
-    apt-add-repository multiverse && \
+# 更新软件源，启用 non-free 存储库
+RUN echo "deb http://deb.debian.org/debian bullseye main contrib non-free" > /etc/apt/sources.list && \
+    echo "deb http://deb.debian.org/debian-security bullseye-security main contrib non-free" >> /etc/apt/sources.list && \
     apt-get update && \
     apt-get install -y unrar
 
