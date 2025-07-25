@@ -6,7 +6,7 @@ import io
 st.title("Keepa数据整理")
 
 # File uploader
-uploaded_file = st.file_uploader("Choose an Excel file", type=['xlsx', 'xls'])
+uploaded_file = st.file_uploader("选择keepa导出文件", type=['xlsx', 'xls'])
 
 if uploaded_file is not None:
     # Read Excel file
