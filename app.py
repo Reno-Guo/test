@@ -6,6 +6,7 @@ from datetime import datetime
 import io
 import zipfile
 import tempfile
+from openpyxl import Workbook
 
 # 合并数据表格功能
 def merge_data_app():
