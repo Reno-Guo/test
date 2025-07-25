@@ -6,7 +6,7 @@ from datetime import datetime
 import io
 import zipfile
 import tempfile
-from openpyxl import Workbook  # 添加 Workbook 导入
+from openpyxl import Workbook
 
 # 合并数据表格功能
 def merge_data_app():
@@ -227,26 +227,32 @@ def search_insight_app():
                 if "Sheet" in workbook.sheetnames:
                     workbook.remove(workbook["Sheet"])
                 
-                # 始终创建源数据工作表
-                df.to_excel(output_path, sheet_name='源数据', index=False, engine='openpyxl')
+                # 创建源数据工作表
+                ws_source = workbook.create_sheet('源数据')
+                for r in dataframe_to_rows(df, index=False, header=True):
+                    ws_source.append(r)
                 
-                with pd.ExcelWriter(output_path, engine='openpyxl', mode='a') as writer:
-                    writer.book = workbook
-                    # 如果品牌词数据不为空，写入品牌词拆解
-                    if not brand_words_df.empty:
-                        brand_words_df.to_excel(writer, sheet_name='品牌词拆解', index=False)
-                    
-                    # 如果有参数数据，写入参数拆解
-                    for param_name, heats in param_heats.items():
-                        if heats:
-                            param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
-                            clean_sheet_name = param_name[:31].translate(str.maketrans('', '', '\/?*[]'))
-                            param_df.to_excel(writer, sheet_name=f"{clean_sheet_name}拆解", index=False)
-                    
-                    # 如果流量结构数据不为空，写入品类流量结构
-                    df_selected = df[['词性', '搜索量']].groupby('词性').sum().reset_index()
-                    if not df_selected.empty:
-                        df_selected.to_excel(writer, sheet_name='品类流量结构', index=False)
+                # 创建品牌词拆解工作表（如果不为空）
+                if not brand_words_df.empty:
+                    ws_brands = workbook.create_sheet('品牌词拆解')
+                    for r in dataframe_to_rows(brand_words_df, index=False, header=True):
+                        ws_brands.append(r)
+                
+                # 创建参数拆解工作表（如果有参数数据）
+                for param_name, heats in param_heats.items():
+                    if heats:
+                        param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum().sort_values(by='搜索量', ascending=False)
+                        clean_sheet_name = param_name[:31].translate(str.maketrans('', '', '\/?*[]'))
+                        ws_param = workbook.create_sheet(f"{clean_sheet_name}拆解")
+                        for r in dataframe_to_rows(param_df, index=False, header=True):
+                            ws_param.append(r)
+                
+                # 创建品类流量结构工作表（如果不为空）
+                df_selected = df[['词性', '搜索量']].groupby('词性').sum().reset_index()
+                if not df_selected.empty:
+                    ws_traffic = workbook.create_sheet('品类流量结构')
+                    for r in dataframe_to_rows(df_selected, index=False, header=True):
+                        ws_traffic.append(r)
                 
                 # 保存工作簿到缓冲区以供下载
                 buffer = io.BytesIO()
