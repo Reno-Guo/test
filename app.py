@@ -288,12 +288,12 @@ def pie_chart(df, value_col, name_col, title):
     fig.update_traces(textinfo='label+percent', sort=False)
 
     fig.update_layout(
-        height=900,
+        height=750,
         legend=dict(
-            orientation="v",
-            x=1,
-            y=0.5,
-            font=dict(size=14)
+            orientation="h",
+            x=0.5,
+            y=-0.1,
+            font=dict(size=16)
         ),
         margin=dict(l=20, r=150, t=50, b=50),
         font=dict(size=16)  # 全局字体，包括饼图标签
