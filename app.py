@@ -262,6 +262,33 @@ def aggregate_top_n(df, value_col, name_col, top_n=10):
     
     return final_df
 
+def pie_chart(df, value_col, name_col, title):
+    df = df.copy()
+
+    # 控制分类顺序，确保 Others 在最后
+    df[name_col] = df[name_col].astype(str)
+    df = df.sort_values(by=value_col, ascending=False).reset_index(drop=True)
+    if 'Others' in df[name_col].values:
+        categories = [name for name in df[name_col] if name != 'Others'] + ['Others']
+        df[name_col] = pd.Categorical(df[name_col], categories=categories, ordered=True)
+    else:
+        df[name_col] = pd.Categorical(df[name_col], ordered=True)
+
+    fig = px.pie(
+        df,
+        values=value_col,
+        names=name_col,
+        title=title,
+        category_orders={name_col: df[name_col].cat.categories.tolist()}
+    )
+    fig.update_traces(textinfo='label+percent', sort=False)
+    fig.update_layout(
+        height=900,
+        legend=dict(orientation="v", x=1, y=0.5),
+        margin=dict(l=20, r=150, t=50, b=50)
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
 def search_insight_viz_app():
     with st.expander("搜索流量洞察可视化", expanded=False):
         st.header("搜索流量洞察可视化")
@@ -284,7 +311,6 @@ def search_insight_viz_app():
 
                 brand_words_list = []
                 for index, row in df.iterrows():
-                    search_word = str(row['搜索词']).lower()
                     search_volumn = row['搜索量'] if pd.notna(row['搜索量']) else 0
                     brand_value = str(row['品牌']) if not pd.isna(row['品牌']) else ''
                     matched_brands = brand_value.split(',') if brand_value else []
@@ -302,7 +328,6 @@ def search_insight_viz_app():
                     if column not in ['搜索词', '搜索量', '品牌名称', '品牌', '特性参数', '词性']:
                         param_heats[column] = []
                         for index, row in df.iterrows():
-                            search_word = str(row['搜索词']).lower()
                             search_volumn = row['搜索量'] if pd.notna(row['搜索量']) else 0
                             param_value = str(row[column]) if not pd.isna(row[column]) else ''
                             matched_values = param_value.split(',') if param_value else []
@@ -349,14 +374,6 @@ def search_insight_viz_app():
                 buffer.seek(0)
 
                 st.subheader("数据可视化")
-                def pie_chart(df, value_col, name_col, title):
-                    fig = px.pie(df, values=value_col, names=name_col, title=title, width=700, height=500)
-                    fig.update_traces(textinfo='label+percent')
-                    fig.update_layout(
-                        legend=dict(orientation="v", x=1, y=0.5),
-                        margin=dict(l=20, r=150, t=50, b=50)
-                    )
-                    st.plotly_chart(fig, use_container_width=False)
 
                 if not brand_words_df.empty:
                     pie_chart(brand_words_df, '搜索量', '品牌名称', "品牌词拆解")
@@ -381,9 +398,9 @@ def search_insight_viz_app():
                 if st.checkbox("保存到 /tmp 目录", key="viz_save_result"):
                     workbook.save(output_path)
                     st.success(f"文件已保存到 {output_path}")
+
             except Exception as e:
                 st.error(f"处理数据时发生错误：{e}")
-
 
 # 主应用程序
 def main():
