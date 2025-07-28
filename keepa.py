@@ -42,10 +42,9 @@ if uploaded_file is not None:
     result_df['评分'] = pd.to_numeric(result_df['评分'], errors='coerce').fillna(0)
     result_df['评分数'] = pd.to_numeric(result_df['评分数'], errors='coerce').fillna(0)
     
-    # Calculate review count growth percentage
+    # Calculate review count growth percentage (numeric format, no + or %)
     result_df['评分数增长%'] = result_df['评分数'].pct_change() * 100
     result_df['评分数增长%'] = result_df['评分数增长%'].fillna(0).round(1)
-    result_df['评分数增长%'] = result_df['评分数增长%'].apply(lambda x: f"+{x:.1f}%" if x > 0 else f"{x:.1f}%")
     
     # Format date to YYYY-MM
     result_df['日期'] = result_df['日期'].dt.strftime('%Y-%m')
@@ -61,9 +60,11 @@ if uploaded_file is not None:
     # Drop temporary column
     result_df = result_df.drop(columns=['年月'])
     
-    # Display the processed data
+    # Display the processed data with formatted percentage for display only
+    display_df = result_df.copy()
+    display_df['评分数增长%'] = display_df['评分数增长%'].apply(lambda x: f"{x:.1f}%")
     st.write("### 处理后的数据预览")
-    st.dataframe(result_df)
+    st.dataframe(display_df)
     
     # Convert DataFrame to Excel
     excel_buffer = io.BytesIO()
