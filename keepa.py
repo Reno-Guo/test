@@ -3,6 +3,26 @@ import pandas as pd
 import io
 import math
 
+# App configuration
+APP_CONFIG = {
+    "app_title": "Keepa数据整理与可视化",
+    "author": "海翼IDC团队",
+    "version": "v1.0.0",
+    "contact": "idc@oceanwing.com",
+    "company": "Anker Oceanwing Inc."
+}
+
+# Streamlit app title
+st.title(APP_CONFIG["app_title"])
+
+# Display app configuration
+st.markdown(f"""
+**版本**: {APP_CONFIG["version"]}  
+**作者**: {APP_CONFIG["author"]}  
+**公司**: {APP_CONFIG["company"]}  
+**联系方式**: {APP_CONFIG["contact"]}  
+""")
+
 # Streamlit app title
 st.title("Keepa数据整理与可视化")
 
