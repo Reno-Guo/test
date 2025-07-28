@@ -12,10 +12,16 @@ uploaded_file = st.file_uploader("选择Keepa导出的Excel文件", type=['xlsx'
 
 if uploaded_file is not None:
     # Read Excel file
-    df = pd.read_excel(uploaded_file, sheet_name=0)
-    
+    try:
+        df = pd.read_excel(uploaded_file, sheet_name=0, engine='openpyxl')
+    except Exception as e:
+        st.error(f"无法读取Excel文件: {str(e)}")
+        st.write("请确保上传的文件是有效的Excel文件（.xlsx或.xls格式）。")
+        uploaded_file = None
+
+if uploaded_file is not None:
     # Data cleaning: Convert date column to datetime
-    df['日期'] = pd.to_datetime(df['日期'])
+    df['日期'] = pd.to_datetime(df['日期'], errors='coerce')
     
     # Group by year-month, get last day record of each month
     df['年月'] = df['日期'].dt.to_period('M')
@@ -59,38 +65,47 @@ if uploaded_file is not None:
     st.write("### 处理后的数据预览")
     st.dataframe(result_df)
     
-    # Convert DataFrame to CSV
-    csv_buffer = io.StringIO()
-    result_df.to_csv(csv_buffer, index=False, encoding='utf-8-sig')
-    csv_data = csv_buffer.getvalue()
+    # Convert DataFrame to Excel
+    excel_buffer = io.BytesIO()
+    result_df.to_excel(excel_buffer, index=False, engine='openpyxl')
+    excel_data = excel_buffer.getvalue()
     
-    # Download button for CSV
+    # Download button for Excel
     st.download_button(
-        label="下载处理后的CSV",
-        data=csv_data,
-        file_name="monthly_last_day_ratings.csv",
-        mime="text/csv"
+        label="下载处理后的Excel文件",
+        data=excel_data,
+        file_name="monthly_last_day_ratings.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
     
     # Reminder about adding sales column
-    st.info("请在下载的 CSV 文件的 H 列添加 '销量' 列，以包含按月销售数据。")
+    st.info("请在下载的Excel文件的H列添加'销量'列，以包含按月销售数据。")
 else:
     st.write("请上传Excel文件以继续处理。")
 
 # Section 2: Visualization
 st.header("可视化")
-uploaded_csv = st.file_uploader("选择包含销量的CSV文件", type=['csv'], key="visualization")
+uploaded_xlsx = st.file_uploader("选择包含销量的Excel文件", type=['xlsx'], key="visualization")
 
-if uploaded_csv is not None:
-    # Read CSV file
-    viz_df = pd.read_csv(uploaded_csv, encoding='utf-8-sig')
+if uploaded_xlsx is not None:
+    # Reset file pointer
+    uploaded_xlsx.seek(0)
     
+    # Read Excel file
+    try:
+        viz_df = pd.read_excel(uploaded_xlsx, engine='openpyxl')
+    except Exception as e:
+        st.error(f"无法读取Excel文件: {str(e)}")
+        st.write("请确保上传的文件是有效的Excel文件（.xlsx格式）且包含正确的列。")
+        uploaded_xlsx = None
+
+if uploaded_xlsx is not None:
     # Check required columns
     required_columns = ['日期', '评分', '评分数', 'Prime价格天数', 'Coupon价格天数', 'Deal价格天数', '销量']
     missing_columns = [col for col in required_columns if col not in viz_df.columns]
     
     if missing_columns:
-        st.error(f"上传的CSV文件缺少以下必要列：{', '.join(missing_columns)}")
+        st.error(f"上传的Excel文件缺少以下必要列：{', '.join(missing_columns)}")
     else:
         # Ensure data types
         viz_df['日期'] = pd.to_datetime(viz_df['日期'], errors='coerce')
@@ -381,4 +396,4 @@ if uploaded_csv is not None:
             mime="text/html"
         )
 else:
-    st.write("请上传包含销量的CSV文件以生成可视化图表。")
+    st.write("请上传包含销量的Excel文件以生成可视化图表。")
