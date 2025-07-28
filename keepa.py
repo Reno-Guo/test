@@ -478,7 +478,7 @@ if uploaded_xlsx is not None:
                         align: 'top',
                         offset: 4,
                         font: {{
-                            size: 10
+                            size: 8
                         }},
                         color: '#333'
                     }}
