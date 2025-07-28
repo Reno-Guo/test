@@ -116,6 +116,11 @@ if uploaded_xlsx is not None:
         viz_df['Deal价格天数'] = pd.to_numeric(viz_df['Deal价格天数'], errors='coerce').fillna(0)
         viz_df['销量'] = pd.to_numeric(viz_df['销量'], errors='coerce').fillna(0)
         
+        # Calculate review rate (评分数 / 销量 * 100)
+        viz_df['留评率'] = viz_df.apply(
+            lambda x: round((x['评分数'] / x['销量'] * 100), 1) if x['销量'] != 0 else 0, axis=1
+        )
+        
         # Format date to YY/MM
         viz_df['日期'] = viz_df['日期'].dt.strftime('%y/%m')
         
@@ -127,10 +132,12 @@ if uploaded_xlsx is not None:
         prime_days = viz_df['Prime价格天数'].tolist()
         coupon_days = viz_df['Coupon价格天数'].tolist()
         deal_days = viz_df['Deal价格天数'].tolist()
+        review_rates = viz_df['留评率'].tolist()
         
-        # Calculate max sales for y-axis
+        # Calculate max sales and review rate for y-axis
         max_sales = max(sales) if sales else 1000
         sales_y_max = math.ceil(max_sales / 1000) * 1000
+        max_review_rate = max(review_rates) * 1.1 if review_rates else 100
         
         # HTML template for charts
         html_template = f"""<!DOCTYPE html>
@@ -164,6 +171,8 @@ if uploaded_xlsx is not None:
     <canvas id="lineChart" width="900" height="400"></canvas>
     <h2>Prime、Coupon、Deal价格天数和销量</h2>
     <canvas id="barChart" width="900" height="400"></canvas>
+    <h2>留评率趋势</h2>
+    <canvas id="reviewRateChart" width="900" height="400"></canvas>
 
     <script>
         // 折线图（评分数、评分和销量）
@@ -374,6 +383,80 @@ if uploaded_xlsx is not None:
                         formatter: (value) => value,
                         align: (context) => context.dataset.type === 'line' ? 'top' : 'end',
                         anchor: (context) => context.dataset.type === 'line' ? 'center' : 'end',
+                        offset: 4,
+                        font: {{
+                            size: 10
+                        }},
+                        color: '#333'
+                    }}
+                }}
+            }},
+            plugins: [ChartDataLabels]
+        }});
+
+        // 折线图（留评率）
+        const reviewRateCtx = document.getElementById('reviewRateChart').getContext('2d');
+        new Chart(reviewRateCtx, {{
+            type: 'line',
+            data: {{
+                labels: {labels},
+                datasets: [
+                    {{
+                        label: '留评率 (%)',
+                        data: {review_rates},
+                        borderColor: '#59a14f',
+                        backgroundColor: '#59a14f',
+                        fill: false,
+                        tension: 0.1,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        yAxisID: 'y'
+                    }}
+                ]
+            }},
+            options: {{
+                scales: {{
+                    x: {{
+                        title: {{
+                            display: true,
+                            text: '日期 (年/月)'
+                        }},
+                        ticks: {{
+                            maxRotation: 45,
+                            minRotation: 45
+                        }}
+                    }},
+                    y: {{
+                        type: 'linear',
+                        position: 'left',
+                        title: {{
+                            display: true,
+                            text: '留评率 (%)'
+                        }},
+                        beginAtZero: true,
+                        max: {max_review_rate},
+                        ticks: {{
+                            stepSize: {max_review_rate / 10 if max_review_rate > 0 else 10}
+                        }}
+                    }}
+                }},
+                plugins: {{
+                    legend: {{
+                        display: true,
+                        position: 'top'
+                    }},
+                    tooltip: {{
+                        enabled: true,
+                        callbacks: {{
+                            label: function(context) {{
+                                return context.dataset.label + ': ' + context.parsed.y.toFixed(1) + '%';
+                            }}
+                        }}
+                    }},
+                    datalabels: {{
+                        display: true,
+                        formatter: (value) => value.toFixed(1) + '%',
+                        align: 'top',
                         offset: 4,
                         font: {{
                             size: 10
