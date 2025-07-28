@@ -134,9 +134,10 @@ if uploaded_xlsx is not None:
         viz_df['Deal价格天数'] = pd.to_numeric(viz_df['Deal价格天数'], errors='coerce').fillna(0)
         viz_df['销量'] = pd.to_numeric(viz_df['销量'], errors='coerce').fillna(0)
         
-        # Calculate review rate (评分数 / 销量 * 100)
+        # Calculate cumulative sales and review rate (当月评分数 / 累积销量 * 100)
+        viz_df['累积销量'] = viz_df['销量'].cumsum()
         viz_df['留评率'] = viz_df.apply(
-            lambda x: round((x['评分数'] / x['销量'] * 100), 1) if x['销量'] != 0 else 0, axis=1
+            lambda x: round((x['评分数'] / x['累积销量'] * 100), 1) if x['累积销量'] != 0 else 0, axis=1
         )
         
         # Format date to YY/MM
