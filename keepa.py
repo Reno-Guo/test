@@ -86,7 +86,7 @@ else:
 
 # Section 2: Visualization
 st.header("可视化")
-uploaded_xlsx = st.file_uploader("选择包含销量的Excel文件", type=['xlsx'], key="visualization")
+uploaded_xlsx = st.file_uploader("选择包含销量的Excel文件(在第一步生成的文件中，H列填入对应月份的销量，表头为“销量”)", type=['xlsx'], key="visualization")
 
 if uploaded_xlsx is not None:
     # Reset file pointer
