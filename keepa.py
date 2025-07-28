@@ -23,9 +23,6 @@ st.markdown(f"""
 **联系方式**: {APP_CONFIG["contact"]}  
 """)
 
-# Streamlit app title
-st.title("Keepa数据整理与可视化")
-
 # Section 1: Data Processing
 st.header("数据处理")
 uploaded_file = st.file_uploader("选择Keepa导出的Excel文件", type=['xlsx', 'xls'], key="data_processing")
