@@ -10,6 +10,15 @@ from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 import plotly.express as px
 
+# App configuration
+APP_CONFIG = {
+    "app_title": "市场洞察小程序",
+    "author": "海翼IDC团队",
+    "version": "v1.0.0",
+    "contact": "idc@oceanwing.com",
+    "company": "Anker Oceanwing Inc."
+}
+
 # 合并数据表格功能
 def merge_data_app():
     with st.expander("MI-合并数据表格", expanded=False):
@@ -427,8 +436,16 @@ def search_insight_viz_app():
 
 # 主应用程序
 def main():
-    st.set_page_config(page_title="市场洞察小程序", layout="wide")
-    st.title("市场洞察小程序")
+    st.set_page_config(page_title=APP_CONFIG["app_title"], layout="wide")
+    st.title(APP_CONFIG["app_title"])
+    
+    # Display app configuration
+    st.markdown(f"""
+    **版本**: {APP_CONFIG["version"]}  
+    **作者**: {APP_CONFIG["author"]}  
+    **公司**: {APP_CONFIG["company"]}  
+    **联系方式**: {APP_CONFIG["contact"]}  
+    """)
     
     st.header("功能选择")
     st.write("点击以下任一功能以展开操作界面：")
