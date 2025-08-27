@@ -7,7 +7,7 @@ import math
 APP_CONFIG = {
     "app_title": "Keepa数据整理与可视化",
     "author": "海翼IDC团队",
-    "version": "v1.0.0",
+    "version": "v1.1.0",
     "contact": "idc@oceanwing.com",
     "company": "Anker Oceanwing Inc."
 }
@@ -97,13 +97,13 @@ if uploaded_file is not None:
     )
     
     # Reminder about adding sales column
-    st.info("请在下载的Excel文件的H列添加'销量'列，以包含按月销售数据。")
+    st.info("请在下载的Excel文件的H列添加'销量'列、I列添加'销售额'列，以包含按月销售数据。")
 else:
     st.write("请上传Excel文件以继续处理。")
 
 # Section 2: Visualization
 st.header("可视化")
-uploaded_xlsx = st.file_uploader("选择包含销量的Excel文件(在第一步生成的文件中，H列填入对应月份的销量，表头为“销量”)", type=['xlsx'], key="visualization")
+uploaded_xlsx = st.file_uploader("选择包含销量的Excel文件(在第一步生成的文件中：H列填入对应月份的销量，表头为“销量”；I列填入对应月份的销售额，表头为“销售额”)", type=['xlsx'], key="visualization")
 
 if uploaded_xlsx is not None:
     # Reset file pointer
