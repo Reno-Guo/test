@@ -6,3 +6,4 @@ matplotlib>=3.9.1
 adjustText>=1.2.0
 plotly>=5.22.0
 json
+datatime
