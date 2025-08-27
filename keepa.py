@@ -25,7 +25,7 @@ st.markdown(f"""
 
 # Section 1: Data Processing
 st.header("数据处理")
-uploaded_file = st.file_uploader("选择Keepa导出的Excel文件", type=['xlsx', 'xls'], key="data_processing")
+uploaded_file = st.file_uploader("选择Keepa导出的Excel文件", type=['xlsx'], key="data_processing")
 
 if uploaded_file is not None:
     # Read Excel file
@@ -33,7 +33,7 @@ if uploaded_file is not None:
         df = pd.read_excel(uploaded_file, sheet_name=0, engine='openpyxl')
     except Exception as e:
         st.error(f"无法读取Excel文件: {str(e)}")
-        st.write("请确保上传的文件是有效的Excel文件（.xlsx或.xls格式）。")
+        st.write("请确保上传的文件是有效的Excel文件（.xlsx）。")
         uploaded_file = None
 
 if uploaded_file is not None:
@@ -103,7 +103,7 @@ else:
 
 # Section 2: Visualization
 st.header("可视化")
-uploaded_xlsx = st.file_uploader("选择包含销量的Excel文件(在第一步生成的文件中：H列填入对应月份的销量，表头为“销量”；I列填入对应月份的销售额，表头为“销售额”)", type=['xlsx'], key="visualization")
+uploaded_xlsx = st.file_uploader("选择包含销量和销售额的Excel文件(在第一步生成的文件中：H列填入对应月份的销量，表头为“销量”；I列填入对应月份的销售额，表头为“销售额”)", type=['xlsx'], key="visualization")
 
 if uploaded_xlsx is not None:
     # Reset file pointer
