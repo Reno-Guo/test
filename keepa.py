@@ -25,7 +25,7 @@ st.markdown(f"""
 
 # Section 1: Data Processing
 st.header("数据处理")
-uploaded_file = st.file_uploader("选择Keepa导出的Excel文件", type=['xlsx'], key="data_processing")
+uploaded_file = st.file_uploader("选择Keepa导出的Excel文件", type=['xlsx', 'xls'], key="data_processing")
 
 if uploaded_file is not None:
     # Read Excel file
@@ -33,7 +33,7 @@ if uploaded_file is not None:
         df = pd.read_excel(uploaded_file, sheet_name=0, engine='openpyxl')
     except Exception as e:
         st.error(f"无法读取Excel文件: {str(e)}")
-        st.write("请确保上传的文件是有效的Excel文件（.xlsx）。")
+        st.write("请确保上传的文件是有效的Excel文件（.xlsx或.xls格式）。")
         uploaded_file = None
 
 if uploaded_file is not None:
@@ -103,7 +103,7 @@ else:
 
 # Section 2: Visualization
 st.header("可视化")
-uploaded_xlsx = st.file_uploader("选择包含销量和销售额的Excel文件(在第一步生成的文件中：H列填入对应月份的销量，表头为“销量”；I列填入对应月份的销售额，表头为“销售额”)", type=['xlsx'], key="visualization")
+uploaded_xlsx = st.file_uploader("选择包含销量的Excel文件(在第一步生成的文件中：H列填入对应月份的销量，表头为“销量”；I列填入对应月份的销售额，表头为“销售额”)", type=['xlsx'], key="visualization")
 
 if uploaded_xlsx is not None:
     # Reset file pointer
@@ -497,5 +497,139 @@ if uploaded_xlsx is not None:
             file_name="product_trend_charts.html",
             mime="text/html"
         )
+        # ===== 新增：导出“销量+销售额（绿色水平虚线）”的单独HTML =====
+        # 销售额列若不存在则以0填充
+        sales_amount = viz_df['销售额'].astype(float).fillna(0).tolist() if '销售额' in viz_df.columns else [0] * len(viz_df)
+
+        # 绿色水平虚线阈值（基于销售额最大值，严格大于）
+        max_amt = max(sales_amount) if sales_amount else 0
+        _thresholds = [100000, 300000, 500000, 750000, 1000000]
+        _selected = [t for t in _thresholds if max_amt > t]
+
+        # 注解线段JS片段
+        def _fmt(n):
+            try:
+                return f"{int(n):,}"
+            except:
+                return str(n)
+        _annotations_js = ",\n".join([
+            f"""
+            \"line{i+1}\": {{
+              \"type\": \"line\",
+              \"yMin\": {t}, \"yMax\": {t},
+              \"yScaleID\": \"y2\",
+              \"borderColor\": \"rgba(0,128,0,0.9)\",
+              \"borderWidth\": 2,
+              \"borderDash\": [6,6],
+              \"label\": {{
+                \"display\": true,
+                \"content\": \"{_fmt(t)}\",
+                \"position\": \"end\",
+                \"backgroundColor\": \"rgba(0,0,0,0.06)\",
+                \"color\": \"#0a0\"
+              }}
+            }}
+            """.strip()
+            for i, t in enumerate(_selected)
+        ])
+
+        sales_chart_html = f"""
+<!DOCTYPE html>
+<html lang=\"zh-CN\">
+<head>
+<meta charset=\"utf-8\">
+<title>Sales Chart</title>
+<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+<style>
+  body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; }}
+  h1 {{ margin: 0 0 16px; }}
+  .chart-wrap {{ max-width: 1200px; height: 520px; }}
+</style>
+</head>
+<body>
+
+<h1>销量 & 销售额（含绿色水平虚线）</h1>
+<div class=\"chart-wrap\"><canvas id=\"salesAmountChart\"></canvas></div>
+
+<script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\"></script>
+<script src=\"https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js\"></script>
+
+<script>
+(function(){{
+  var Annotation = window['chartjs-plugin-annotation'] || window.ChartAnnotation;
+  if (Annotation && window.Chart && typeof window.Chart.register === 'function') {{
+    window.Chart.register(Annotation);
+  }}
+
+  const labels = {labels};
+  const vol = {sales};
+  const amt = {sales_amount};
+
+  const ctx = document.getElementById('salesAmountChart').getContext('2d');
+  new Chart(ctx, {{
+    type: 'bar',
+    data: {{
+      labels,
+      datasets: [
+        {{
+          type: 'bar',
+          label: '销量',
+          data: vol,
+          yAxisID: 'y1'
+        }},
+        {{
+          type: 'line',
+          label: '销售额',
+          data: amt,
+          yAxisID: 'y2',
+          borderWidth: 2,
+          tension: 0.25
+        }}
+      ]
+    }},
+    options: {{
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {{ mode: 'index', intersect: false }},
+      scales: {{
+        y1: {{
+          type: 'linear',
+          position: 'left',
+          beginAtZero: true,
+          title: {{ display: true, text: '销量' }}
+        }},
+        y2: {{
+          type: 'linear',
+          position: 'right',
+          beginAtZero: true,
+          title: {{ display: true, text: '销售额' }},
+          grid: {{ drawOnChartArea: false }}
+        }}
+      }},
+      plugins: {{
+        legend: {{ position: 'top' }},
+        tooltip: {{ mode: 'index', intersect: false }},
+        annotation: {{
+          annotations: {{
+            {_annotations_js}
+          }}
+        }}
+      }}
+    }}
+  }});
+}})();
+</script>
+
+</body>
+</html>
+"""
+
+        st.download_button(
+            label="下载销量-销售额单图（sales_chart_fixed_green.html）",
+            data=sales_chart_html,
+            file_name="sales_chart_fixed_green.html",
+            mime="text/html"
+        )
+
 else:
     st.write("请上传包含销量的Excel文件以生成可视化图表。")
