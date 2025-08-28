@@ -10,11 +10,27 @@ from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 import plotly.express as px
 
+from uuid import uuid4
+
+# === Concurrency-safe session + helpers ===
+if "SID" not in st.session_state:
+    st.session_state.SID = uuid4().hex[:6]
+
+def unique_tmp_path(suggest_name: str, default_ext: str = ".xlsx") -> str:
+    base, ext = os.path.splitext(suggest_name or f"result{default_ext}")
+    ext = ext or default_ext
+    return os.path.join("/tmp", f"{base}_{st.session_state.SID}_{uuid4().hex[:8]}{ext}")
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _read_excel_cached(file_or_path, sheet_name=None):
+    return _read_excel_cached(file_or_path, sheet_name=sheet_name)
+
+
 # App configuration
 APP_CONFIG = {
     "app_title": "市场洞察小程序",
     "author": "海翼IDC团队",
-    "version": "v1.0.0",
+    "version": "v1.0.1",
     "contact": "idc@oceanwing.com",
     "company": "Anker Oceanwing Inc."
 }
@@ -33,7 +49,7 @@ def merge_data_app():
                 st.warning("请确保已选择 .zip 文件并输入文件名")
                 return
             
-            save_path = os.path.join("/tmp", save_filename) if not save_filename.startswith("/tmp") else save_filename
+            save_path = unique_tmp_path(save_filename)
             
             try:
                 # 创建临时目录用于解压文件
@@ -65,9 +81,9 @@ def merge_data_app():
                         file_path = os.path.join(temp_dir, file_name)
                         try:
                             if file_name.endswith('.xlsx'):
-                                df = pd.read_excel(file_path, engine='openpyxl')
+                                df = _read_excel_cached(file_path, engine='openpyxl')
                             elif file_name.endswith('.xls'):
-                                df = pd.read_excel(file_path, engine='xlrd')
+                                df = _read_excel_cached(file_path, engine='xlrd')
                             elif file_name.endswith('.csv'):
                                 df = pd.read_csv(file_path)
                             df['时间'] = os.path.splitext(file_name)[0]
@@ -150,11 +166,11 @@ def search_insight_app():
                 st.warning("请确保已上传数据文件并输入输出文件名")
                 return
             
-            save_path = os.path.join("/tmp", save_filename) if not save_filename.startswith("/tmp") else save_filename
+            save_path = unique_tmp_path(save_filename)
             
             try:
                 # 读取输入数据
-                df = pd.read_excel(uploaded_file)
+                df = _read_excel_cached(uploaded_file)
                 if df.empty:
                     st.warning("上传的文件为空，请检查数据文件")
                     return
@@ -333,10 +349,10 @@ def search_insight_viz_app():
                 st.warning("请确保已上传数据文件并输入输出文件名")
                 return
 
-            save_path = os.path.join("/tmp", save_filename) if not save_filename.startswith("/tmp") else save_filename
+            save_path = unique_tmp_path(save_filename)
 
             try:
-                df = pd.read_excel(uploaded_file, sheet_name='源数据')
+                df = _read_excel_cached(uploaded_file, sheet_name='源数据')
                 if df.empty:
                     st.warning("上传的文件为空或不包含‘源数据’工作表，请检查数据文件")
                     return
