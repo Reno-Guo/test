@@ -490,50 +490,81 @@ if uploaded_xlsx is not None:
 </body>
 </html>
 """
-        
-        sales_amount = viz_df['销售额'].astype(float).fillna(0).tolist() if '销售额' in viz_df.columns else [0]*len(viz_df)
-        max_amt = max(sales_amount) if sales_amount else 0
-        thresholds = [100000, 300000, 500000, 750000, 1000000]
-        selected = [t for t in thresholds if max_amt > t]
+        # Download button for HTML
+        st.download_button(
+            label="下载可视化HTML文件",
+            data=html_template,
+            file_name="product_trend_charts.html",
+            mime="text/html"
+        )
+        # ===== 新增：导出“销量+销售额（绿色水平虚线）”的单独HTML =====
+        # 销售额列若不存在则以0填充
+        sales_amount = viz_df['销售额'].astype(float).fillna(0).tolist() if '销售额' in viz_df.columns else [0] * len(viz_df)
 
-        def _fmt(n): return f"{int(n):,}"
-        annotations_js = ",\n".join([
-            f'''
-            "line{idx+1}": {{
-              "type": "line",
-              "yMin": {t}, "yMax": {t},
-              "yScaleID": "y2",
-              "borderColor": "rgba(0,128,0,0.9)",
-              "borderWidth": 2,
-              "borderDash": [6,6],
-              "label": {{
-                "display": true,
-                "content": "{_fmt(t)}",
-                "position": "end",
-                "backgroundColor": "rgba(0,0,0,0.06)",
-                "color": "#0a0"
+        # 绿色水平虚线阈值（基于销售额最大值，严格大于）
+        max_amt = max(sales_amount) if sales_amount else 0
+        _thresholds = [100000, 300000, 500000, 750000, 1000000]
+        _selected = [t for t in _thresholds if max_amt > t]
+
+        # 注解线段JS片段
+        def _fmt(n):
+            try:
+                return f"{int(n):,}"
+            except:
+                return str(n)
+        _annotations_js = ",\n".join([
+            f"""
+            \"line{i+1}\": {{
+              \"type\": \"line\",
+              \"yMin\": {t}, \"yMax\": {t},
+              \"yScaleID\": \"y2\",
+              \"borderColor\": \"rgba(0,128,0,0.9)\",
+              \"borderWidth\": 2,
+              \"borderDash\": [6,6],
+              \"label\": {{
+                \"display\": true,
+                \"content\": \"{_fmt(t)}\",
+                \"position\": \"end\",
+                \"backgroundColor\": \"rgba(0,0,0,0.06)\",
+                \"color\": \"#0a0\"
               }}
             }}
-            '''.strip()
-            for idx, t in enumerate(selected)
+            """.strip()
+            for i, t in enumerate(_selected)
         ])
 
-        sales_chart_block = f"""
-<section>
-  <h2>销量 & 销售额</h2>
-  <div class="chart-wrap"><canvas id="salesAmountChart"></canvas></div>
-</section>
+        sales_chart_html = f"""
+<!DOCTYPE html>
+<html lang=\"zh-CN\">
+<head>
+<meta charset=\"utf-8\">
+<title>Sales Chart</title>
+<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+<style>
+  body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; }}
+  h1 {{ margin: 0 0 16px; }}
+  .chart-wrap {{ max-width: 1200px; height: 520px; }}
+</style>
+</head>
+<body>
 
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js"></script>
+<h1>销量 & 销售额</h1>
+<div class=\"chart-wrap\"><canvas id=\"salesAmountChart\"></canvas></div>
+
+<script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\"></script>
+<script src=\"https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js\"></script>
+
 <script>
 (function(){{
   var Annotation = window['chartjs-plugin-annotation'] || window.ChartAnnotation;
   if (Annotation && window.Chart && typeof window.Chart.register === 'function') {{
     window.Chart.register(Annotation);
   }}
+
   const labels = {labels};
   const vol = {sales};
   const amt = {sales_amount};
+
   const ctx = document.getElementById('salesAmountChart').getContext('2d');
   new Chart(ctx, {{
     type: 'bar',
@@ -561,27 +592,44 @@ if uploaded_xlsx is not None:
       maintainAspectRatio: false,
       interaction: {{ mode: 'index', intersect: false }},
       scales: {{
-        y1: {{ type:'linear', position:'left', beginAtZero:true, title:{{display:true,text:'销量'}} }},
-        y2: {{ type:'linear', position:'right', beginAtZero:true, title:{{display:true,text:'销售额'}}, grid:{{drawOnChartArea:false}} }}
+        y1: {{
+          type: 'linear',
+          position: 'left',
+          beginAtZero: true,
+          title: {{ display: true, text: '销量' }}
+        }},
+        y2: {{
+          type: 'linear',
+          position: 'right',
+          beginAtZero: true,
+          title: {{ display: true, text: '销售额' }},
+          grid: {{ drawOnChartArea: false }}
+        }}
       }},
       plugins: {{
-        legend: {{ position:'top' }},
-        tooltip: {{ mode:'index', intersect:false }},
-        annotation: {{ annotations: {{ {annotations_js} }} }}
+        legend: {{ position: 'top' }},
+        tooltip: {{ mode: 'index', intersect: false }},
+        annotation: {{
+          annotations: {{
+            {_annotations_js}
+          }}
+        }}
       }}
     }}
   }});
 }})();
 </script>
+
+</body>
+</html>
 """
 
-        html_template = html_template.replace("</body>\n</html>", sales_chart_block + "\n</body>\n</html>")
-# Download button for HTML
         st.download_button(
-            label="下载可视化HTML文件",
-            data=html_template,
-            file_name="product_trend_charts.html",
+            label="下载销量-销售额单图（sales_chart_fixed_green.html）",
+            data=sales_chart_html,
+            file_name="sales_chart_fixed_green.html",
             mime="text/html"
         )
+
 else:
     st.write("请上传包含销量的Excel文件以生成可视化图表。")
