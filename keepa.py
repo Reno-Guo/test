@@ -602,7 +602,9 @@ sales_chart_block = f"""
 </script>
 """
 
+
 html_template = html_template.replace("</body>\n</html>", sales_chart_block + "\n</body>\n</html>")
+
 
         # Download button for HTML
         st.download_button(
@@ -612,4 +614,4 @@ html_template = html_template.replace("</body>\n</html>", sales_chart_block + "\
             mime="text/html"
         )
 else:
-    st.write("请上传包含销量和销售额的Excel文件以生成可视化图表。")
+    st.write("请上传包含销量的Excel文件以生成可视化图表。")
