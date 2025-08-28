@@ -25,7 +25,7 @@ st.markdown(f"""
 
 # Section 1: Data Processing
 st.header("数据处理")
-uploaded_file = st.file_uploader("选择Keepa导出的Excel文件", type=['xlsx', 'xls'], key="data_processing")
+uploaded_file = st.file_uploader("选择Keepa导出的Excel文件", type=['xlsx'], key="data_processing")
 
 if uploaded_file is not None:
     # Read Excel file
@@ -33,7 +33,7 @@ if uploaded_file is not None:
         df = pd.read_excel(uploaded_file, sheet_name=0, engine='openpyxl')
     except Exception as e:
         st.error(f"无法读取Excel文件: {str(e)}")
-        st.write("请确保上传的文件是有效的Excel文件（.xlsx或.xls格式）。")
+        st.write("请确保上传的文件是有效的Excel文件（.xlsx格式）。")
         uploaded_file = None
 
 if uploaded_file is not None:
@@ -490,70 +490,50 @@ if uploaded_xlsx is not None:
 </body>
 </html>
 """
-        # Download button for HTML
-        st.download_button(
-            label="下载可视化HTML文件",
-            data=html_template,
-            file_name="product_trend_charts.html",
-            mime="text/html"
-        )
-        sales_amount = viz_df['销售额'].astype(float).fillna(0).tolist() if '销售额' in viz_df.columns else [0] * len(viz_df)
+sales_amount = viz_df['销售额'].astype(float).fillna(0).tolist() if '销售额' in viz_df.columns else [0] * len(viz_df)
 
-        # 绿色水平虚线阈值（基于销售额最大值，严格大于）
-        max_amt = max(sales_amount) if sales_amount else 0
-        _thresholds = [100000, 300000, 500000, 750000, 1000000]
-        _selected = [t for t in _thresholds if max_amt > t]
+# 2) 绿色水平虚线阈值（严格 > 判断）
+_max_amt = max(sales_amount) if sales_amount else 0
+_thresholds = [100000, 300000, 500000, 750000, 1000000]
+_selected = [t for t in _thresholds if _max_amt > t]
 
-        # 注解线段JS片段
-        def _fmt(n):
-            try:
-                return f"{int(n):,}"
-            except:
-                return str(n)
-        _annotations_js = ",\n".join([
-            f"""
-            \"line{i+1}\": {{
-              \"type\": \"line\",
-              \"yMin\": {t}, \"yMax\": {t},
-              \"yScaleID\": \"y2\",
-              \"borderColor\": \"rgba(0,128,0,0.9)\",
-              \"borderWidth\": 2,
-              \"borderDash\": [6,6],
-              \"label\": {{
-                \"display\": true,
-                \"content\": \"{_fmt(t)}\",
-                \"position\": \"end\",
-                \"backgroundColor\": \"rgba(0,0,0,0.06)\",
-                \"color\": \"#0a0\"
-              }}
-            }}
-            """.strip()
-            for i, t in enumerate(_selected)
-        ])
+def _fmt_commas(n):
+    try:
+        return f"{int(n):,}"
+    except:
+        return str(n)
 
-        sales_chart_html = f"""
-<!DOCTYPE html>
-<html lang=\"zh-CN\">
-<head>
-<meta charset=\"utf-8\">
-<title>Sales Chart</title>
-<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-<style>
-  body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; }}
-  h1 {{ margin: 0 0 16px; }}
-  .chart-wrap {{ max-width: 1200px; height: 520px; }}
-</style>
-</head>
-<body>
+_annotations_js = ",\n".join([
+    f"""
+    "line{i+1}": {{
+      "type": "line",
+      "yMin": {t}, "yMax": {t},
+      "yScaleID": "y2",
+      "borderColor": "rgba(0,128,0,0.9)",
+      "borderWidth": 2,
+      "borderDash": [6,6],
+      "label": {{
+        "display": true,
+        "content": "{_fmt_commas(t)}",
+        "position": "end",
+        "backgroundColor": "rgba(0,0,0,0.06)",
+        "color": "#0a0"
+      }}
+    }}
+    """.strip()
+    for i, t in enumerate(_selected)
+])
 
-<h1>销量 & 销售额</h1>
-<div class=\"chart-wrap\"><canvas id=\"salesAmountChart\"></canvas></div>
+sales_chart_block = f"""
+<section>
+  <h2>销量 & 销售额</h2>
+  <div class="chart-wrap"><canvas id="salesAmountChart"></canvas></div>
+</section>
 
-<script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\"></script>
-<script src=\"https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js\"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js"></script>
 <script>
 (function(){{
+  // 安全注册 annotation 插件
   var Annotation = window['chartjs-plugin-annotation'] || window.ChartAnnotation;
   if (Annotation && window.Chart && typeof window.Chart.register === 'function') {{
     window.Chart.register(Annotation);
@@ -573,14 +553,17 @@ if uploaded_xlsx is not None:
           type: 'bar',
           label: '销量',
           data: vol,
-          yAxisID: 'y1'
+          yAxisID: 'y1',
+          backgroundColor: '#76b7b2'
         }},
         {{
           type: 'line',
           label: '销售额',
           data: amt,
           yAxisID: 'y2',
-          borderWidth: 2,
+          borderColor: '#1f77b4',
+          backgroundColor: '#1f77b4',
+          fill: false,
           tension: 0.25
         }}
       ]
@@ -617,17 +600,16 @@ if uploaded_xlsx is not None:
   }});
 }})();
 </script>
-
-</body>
-</html>
 """
 
+html_template = html_template.replace("</body>\n</html>", sales_chart_block + "\n</body>\n</html>")
+
+        # Download button for HTML
         st.download_button(
-            label="下载销量-销售额单图（sales_chart_fixed_green.html）",
-            data=sales_chart_html,
-            file_name="sales_chart_fixed_green.html",
+            label="下载可视化HTML文件",
+            data=html_template,
+            file_name="product_trend_charts.html",
             mime="text/html"
         )
-
 else:
-    st.write("请上传包含销量的Excel文件以生成可视化图表。")
+    st.write("请上传包含销量和销售额的Excel文件以生成可视化图表。")
