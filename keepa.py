@@ -497,8 +497,6 @@ if uploaded_xlsx is not None:
             file_name="product_trend_charts.html",
             mime="text/html"
         )
-        # ===== 新增：导出“销量+销售额（绿色水平虚线）”的单独HTML =====
-        # 销售额列若不存在则以0填充
         sales_amount = viz_df['销售额'].astype(float).fillna(0).tolist() if '销售额' in viz_df.columns else [0] * len(viz_df)
 
         # 绿色水平虚线阈值（基于销售额最大值，严格大于）
@@ -548,7 +546,7 @@ if uploaded_xlsx is not None:
 </head>
 <body>
 
-<h1>销量 & 销售额（含绿色水平虚线）</h1>
+<h1>销量 & 销售额</h1>
 <div class=\"chart-wrap\"><canvas id=\"salesAmountChart\"></canvas></div>
 
 <script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\"></script>
