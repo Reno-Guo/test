@@ -534,11 +534,11 @@ if uploaded_xlsx is not None:
 
         sales_chart_html = f"""
 <!DOCTYPE html>
-<html lang=\\"zh-CN\\">
+<html lang="zh-CN">
 <head>
-<meta charset=\\"utf-8\\">
+<meta charset="utf-8">
 <title>Sales Chart</title>
-<meta name=\\"viewport\\" content=\\"width=device-width, initial-scale=1\\">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; }}
   h1 {{ margin: 0 0 16px; }}
@@ -548,16 +548,16 @@ if uploaded_xlsx is not None:
 <body>
 
 <h1>销量 & 销售额</h1>
-<div class=\\"chart-wrap\\"><canvas id=\\"salesAmountChart\\"></canvas></div>
+<div class="chart-wrap"><canvas id="salesAmountChart"></canvas></div>
 
-<script src=\\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\\"></script>
-<script src=\\"https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js\\"></script>
-<!-- 新增：数据标签插件 -->
-<script src=\\"https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2\\"></script>
+<!-- Chart.js 与插件 -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 
 <script>
 (function(){{
-  // 注册插件：annotation + datalabels
+
   var Annotation = window['chartjs-plugin-annotation'] || window.ChartAnnotation;
   if (Annotation && window.Chart && typeof window.Chart.register === 'function') {{
     window.Chart.register(Annotation);
@@ -565,6 +565,7 @@ if uploaded_xlsx is not None:
   if (window.Chart && typeof window.Chart.register === 'function') {{
     window.Chart.register(window.ChartDataLabels);
   }}
+
 
   const labels = {labels};
   const vol = {sales};
@@ -621,14 +622,14 @@ if uploaded_xlsx is not None:
             {_annotations_js}
           }}
         }},
-        // 新增：仅对“销售额”启用数据标签
         datalabels: {{
-          display: (ctx) => ctx.dataset?.label === '销售额',
+          display: (ctx) => ctx?.dataset?.label === '销售额' && ctx.dataset.data[ctx.dataIndex] !== 0,
           align: 'top',
           anchor: 'end',
           offset: 4,
           formatter: (value) => {{
             try {{
+
               return Number(value).toLocaleString();
             }} catch (e) {{
               return value;
@@ -646,6 +647,7 @@ if uploaded_xlsx is not None:
 </body>
 </html>
 """
+
 
 
         st.download_button(
