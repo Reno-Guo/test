@@ -553,101 +553,71 @@ if uploaded_xlsx is not None:
 
 <script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\"></script>
 <script src=\"https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js\"></script>
-<script src=\"https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js\"></script>
 
 <script>
-(function(){
-  const Annotation = window['chartjs-plugin-annotation'] || window.ChartAnnotation;
-  if (Annotation && window.Chart && typeof window.Chart.register === 'function') {
+(function(){{
+  var Annotation = window['chartjs-plugin-annotation'] || window.ChartAnnotation;
+  if (Annotation && window.Chart && typeof window.Chart.register === 'function') {{
     window.Chart.register(Annotation);
-  }
-  const DataLabels = window.ChartDataLabels;
-  if (DataLabels && window.Chart && typeof window.Chart.register === 'function') {
-    window.Chart.register(DataLabels);
-  }
+  }}
 
   const labels = {labels};
   const vol = {sales};
   const amt = {sales_amount};
 
   const ctx = document.getElementById('salesAmountChart').getContext('2d');
-  new Chart(ctx, {
+  new Chart(ctx, {{
     type: 'bar',
-    data: {
+    data: {{
       labels,
       datasets: [
-        {
+        {{
           type: 'bar',
           label: '销量',
           data: vol,
-          yAxisID: 'y1',
-          backgroundColor: 'rgba(54, 162, 235, 0.5)',
-          borderColor: 'rgba(54, 162, 235, 1)',
-          borderWidth: 1,
-          datalabels: {
-            display: true,
-            anchor: 'end',
-            align: 'top',
-            formatter: function(value, context) {
-              const amount = amt[context.dataIndex];
-              return amount != null && !isNaN(amount) ? amount.toLocaleString('zh-CN') : '';
-            },
-            color: '#000',
-            font: {
-              weight: 'bold'
-            }
-          }
-        },
-        {
+          yAxisID: 'y1'
+        }},
+        {{
           type: 'line',
           label: '销售额',
           data: amt,
           yAxisID: 'y2',
           borderWidth: 2,
-          tension: 0.25,
-          borderColor: 'rgba(255, 99, 132, 1)',
-          backgroundColor: 'rgba(255, 99, 132, 0.2)',
-          fill: false,
-          datalabels: {
-            display: false
-          }
-        }
+          tension: 0.25
+        }}
       ]
-    },
-    options: {
+    }},
+    options: {{
       responsive: true,
       maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      scales: {
-        y1: {
+      interaction: {{ mode: 'index', intersect: false }},
+      scales: {{
+        y1: {{
           type: 'linear',
           position: 'left',
           beginAtZero: true,
-          title: { display: true, text: '销量' }
-        },
-        y2: {
+          title: {{ display: true, text: '销量' }}
+        }},
+        y2: {{
           type: 'linear',
           position: 'right',
           beginAtZero: true,
-          title: { display: true, text: '销售额' },
-          grid: { drawOnChartArea: false }
-        }
-      },
-      plugins: {
-        legend: { position: 'top' },
-        tooltip: { mode: 'index', intersect: false },
-        annotation: {
-          annotations: {
+          title: {{ display: true, text: '销售额' }},
+          grid: {{ drawOnChartArea: false }}
+        }}
+      }},
+      plugins: {{
+        legend: {{ position: 'top' }},
+        tooltip: {{ mode: 'index', intersect: false }},
+        annotation: {{
+          annotations: {{
             {_annotations_js}
-          }
-        },
-        datalabels: {
-          display: false
-        }
-      }
-    }
-  });
-})();
+          }}
+        }}
+      }}
+    }}
+  }});
+}})();
 </script>
 
 </body>
