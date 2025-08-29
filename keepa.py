@@ -557,12 +557,16 @@ if uploaded_xlsx is not None:
 
 <script>
 (function(){
-  var Annotation = window['chartjs-plugin-annotation'] || window.ChartAnnotation;
+  // Register chartjs-plugin-annotation
+  const Annotation = window['chartjs-plugin-annotation'] || window.ChartAnnotation;
   if (Annotation && window.Chart && typeof window.Chart.register === 'function') {
     window.Chart.register(Annotation);
   }
-  if (window.ChartDataLabels && window.Chart && typeof window.Chart.register === 'function') {
-    window.Chart.register(window.ChartDataLabels);
+
+  // Register chartjs-plugin-datalabels
+  const DataLabels = window.ChartDataLabels;
+  if (DataLabels && window.Chart && typeof window.Chart.register === 'function') {
+    window.Chart.register(DataLabels);
   }
 
   const labels = {labels};
@@ -581,7 +585,7 @@ if uploaded_xlsx is not None:
           data: vol,
           yAxisID: 'y1',
           datalabels: {
-            display: false
+            display: false // Disable labels for volume bars
           }
         },
         {
@@ -592,7 +596,7 @@ if uploaded_xlsx is not None:
           borderWidth: 2,
           tension: 0.25,
           datalabels: {
-            display: false
+            display: false // Disable labels for line dataset
           }
         }
       ]
@@ -626,12 +630,12 @@ if uploaded_xlsx is not None:
         },
         datalabels: {
           display: function(context) {
-            return context.dataset.type === 'bar';
+            return context.dataset.type === 'bar'; // Show labels only for bar dataset
           },
           anchor: 'end',
           align: 'top',
           formatter: function(value, context) {
-            return amt[context.dataIndex];
+            return amt[context.dataIndex]; // Display sales amount (amt) on top of bars
           },
           color: '#000',
           font: {
