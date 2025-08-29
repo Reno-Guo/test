@@ -497,8 +497,7 @@ if uploaded_xlsx is not None:
             file_name="product_trend_charts.html",
             mime="text/html"
         )
-        # ===== 新增：导出“销量+销售额（绿色水平虚线）”的单独HTML =====
-        # 销售额列若不存在则以0填充
+
         sales_amount = viz_df['销售额'].astype(float).fillna(0).tolist() if '销售额' in viz_df.columns else [0] * len(viz_df)
 
         # 绿色水平虚线阈值（基于销售额最大值，严格大于）
@@ -535,11 +534,11 @@ if uploaded_xlsx is not None:
 
         sales_chart_html = f"""
 <!DOCTYPE html>
-<html lang=\"zh-CN\">
+<html lang=\\"zh-CN\\">
 <head>
-<meta charset=\"utf-8\">
+<meta charset=\\"utf-8\\">
 <title>Sales Chart</title>
-<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+<meta name=\\"viewport\\" content=\\"width=device-width, initial-scale=1\\">
 <style>
   body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; }}
   h1 {{ margin: 0 0 16px; }}
@@ -549,16 +548,22 @@ if uploaded_xlsx is not None:
 <body>
 
 <h1>销量 & 销售额</h1>
-<div class=\"chart-wrap\"><canvas id=\"salesAmountChart\"></canvas></div>
+<div class=\\"chart-wrap\\"><canvas id=\\"salesAmountChart\\"></canvas></div>
 
-<script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\"></script>
-<script src=\"https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js\"></script>
+<script src=\\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\\"></script>
+<script src=\\"https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js\\"></script>
+<!-- 新增：数据标签插件 -->
+<script src=\\"https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2\\"></script>
 
 <script>
 (function(){{
+  // 注册插件：annotation + datalabels
   var Annotation = window['chartjs-plugin-annotation'] || window.ChartAnnotation;
   if (Annotation && window.Chart && typeof window.Chart.register === 'function') {{
     window.Chart.register(Annotation);
+  }}
+  if (window.Chart && typeof window.Chart.register === 'function') {{
+    window.Chart.register(window.ChartDataLabels);
   }}
 
   const labels = {labels};
@@ -583,7 +588,9 @@ if uploaded_xlsx is not None:
           data: amt,
           yAxisID: 'y2',
           borderWidth: 2,
-          tension: 0.25
+          tension: 0.25,
+          pointRadius: 3,
+          pointHoverRadius: 5
         }}
       ]
     }},
@@ -613,6 +620,22 @@ if uploaded_xlsx is not None:
           annotations: {{
             {_annotations_js}
           }}
+        }},
+        // 新增：仅对“销售额”启用数据标签
+        datalabels: {{
+          display: (ctx) => ctx.dataset?.label === '销售额',
+          align: 'top',
+          anchor: 'end',
+          offset: 4,
+          formatter: (value) => {{
+            try {{
+              return Number(value).toLocaleString();
+            }} catch (e) {{
+              return value;
+            }}
+          }},
+          color: '#333',
+          font: {{ size: 10 }}
         }}
       }}
     }}
@@ -623,6 +646,7 @@ if uploaded_xlsx is not None:
 </body>
 </html>
 """
+
 
         st.download_button(
             label="下载销量-销售额单图（sales_chart_fixed_green.html）",
