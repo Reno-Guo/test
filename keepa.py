@@ -553,12 +553,17 @@ if uploaded_xlsx is not None:
 
 <script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\"></script>
 <script src=\"https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js\"></script>
+<script src=\"https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js\"></script>
 
 <script>
 (function(){{
-  var Annotation = window['chartjs-plugin-annotation'] || window.ChartAnnotation;
+  const Annotation = window['chartjs-plugin-annotation'] || window.ChartAnnotation;
   if (Annotation && window.Chart && typeof window.Chart.register === 'function') {{
     window.Chart.register(Annotation);
+  }}
+  const DataLabels = window.ChartDataLabels;
+  if (DataLabels && window.Chart && typeof window.Chart.register === 'function') {{
+    window.Chart.register(DataLabels);
   }}
 
   const labels = {labels};
@@ -575,7 +580,10 @@ if uploaded_xlsx is not None:
           type: 'bar',
           label: '销量',
           data: vol,
-          yAxisID: 'y1'
+          yAxisID: 'y1',
+          datalabels: {{
+            display: false
+          }}
         }},
         {{
           type: 'line',
@@ -583,7 +591,10 @@ if uploaded_xlsx is not None:
           data: amt,
           yAxisID: 'y2',
           borderWidth: 2,
-          tension: 0.25
+          tension: 0.25,
+          datalabels: {{
+            display: false
+          }}
         }}
       ]
     }},
@@ -612,6 +623,20 @@ if uploaded_xlsx is not None:
         annotation: {{
           annotations: {{
             {_annotations_js}
+          }}
+        }},
+        datalabels: {{
+          display: function(context) {{
+            return context.dataset.type === 'bar';
+          }},
+          anchor: 'end',
+          align: 'top',
+          formatter: function(value, context) {{
+            return amt[context.dataIndex];
+          }},
+          color: '#000',
+          font: {{
+            weight: 'bold'
           }}
         }}
       }}
