@@ -636,7 +636,7 @@ if uploaded_xlsx is not None:
             }}
           }},
           color: '#333',
-          font: {{ size: 10 }}
+          font: {{ size: 10, weight: 'bold' }}
         }}
       }}
     }}
