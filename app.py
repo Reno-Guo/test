@@ -22,8 +22,8 @@ def unique_tmp_path(suggest_name: str, default_ext: str = ".xlsx") -> str:
     return os.path.join("/tmp", f"{base}_{st.session_state.SID}_{uuid4().hex[:8]}{ext}")
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _read_excel_cached(file_or_path, sheet_name=None):
-    return _read_excel_cached(file_or_path, sheet_name=sheet_name)
+def _read_excel_cached(file_or_path, sheet_name=None, engine=None):
+    return pd.read_excel(file_or_path, sheet_name=sheet_name, engine=engine)
 
 
 # App configuration
