@@ -699,7 +699,7 @@ def data_clean_app():
                             status_text.text(f"正在处理: {file_name} ({idx+1}/{len(data_files)})")
                             
                             if file_name.endswith(('.xlsx', '.xls')):
-                                df = pd.read_excel(file_path, engine='openpyxl' if file_name.endswith('.xlsx') else 'xlrd')
+                                df = pd.read_excel(file_path, header=None, engine='openpyxl' if file_name.endswith('.xlsx') else 'xlrd')
                             elif file_name.endswith('.csv'):
                                 df = pd.read_csv(file_path, header=None)
                             
