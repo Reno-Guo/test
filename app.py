@@ -9,7 +9,6 @@ import tempfile
 from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 import plotly.express as px
-
 from uuid import uuid4
 
 # === Concurrency-safe session + helpers ===
@@ -25,96 +24,14 @@ def unique_tmp_path(suggest_name: str, default_ext: str = ".xlsx") -> str:
 def _read_excel_cached(file_or_path, sheet_name=0, engine=None):
     return pd.read_excel(file_or_path, sheet_name=sheet_name, engine=engine)
 
-
 # App configuration
 APP_CONFIG = {
     "app_title": "市场洞察小程序",
     "author": "海翼IDC团队",
-    "version": "v1.1.0",
+    "version": "v1.2.0",
     "contact": "idc@oceanwing.com",
     "company": "Anker Oceanwing Inc."
 }
-
-# 合并数据表格功能
-def merge_data_app():
-    with st.expander("MI/SI-合并数据表格", expanded=False):
-        st.header("合并数据表格")
-        
-        # 修改为接受单个 .zip 文件
-        uploaded_file = st.file_uploader("选择一个 .zip 文件（包含需要合并的 Excel 文件）", type=["zip"], accept_multiple_files=False, key="merge_files")
-        save_filename = st.text_input("请输入合并后的文件名（例如：output.xlsx）", key="merge_save")
-        
-        if st.button("合并文件", key="merge_button"):
-            if not uploaded_file or not save_filename:
-                st.warning("请确保已选择 .zip 文件并输入文件名")
-                return
-            
-            save_path = unique_tmp_path(save_filename)
-            
-            try:
-                # 创建临时目录用于解压文件
-                with tempfile.TemporaryDirectory() as temp_dir:
-                    df_list = []
-                    
-                    # 处理上传的压缩文件
-                    file_extension = os.path.splitext(uploaded_file.name)[1].lower()
-                    temp_file_path = os.path.join(temp_dir, uploaded_file.name)
-                    
-                    # 将上传的文件保存到临时目录
-                    with open(temp_file_path, "wb") as f:
-                        f.write(uploaded_file.getbuffer())
-                    
-                    # 解压 .zip 文件
-                    if file_extension == '.zip':
-                        with zipfile.ZipFile(temp_file_path, 'r') as zip_ref:
-                            zip_ref.extractall(temp_dir)
-                    
-                    # 获取解压后的所有 Excel 文件
-                    excel_files = [f for f in os.listdir(temp_dir) if f.endswith(('.xlsx', '.xls', '.csv'))]
-                    
-                    if not excel_files:
-                        st.warning("压缩文件中未找到任何 Excel 或 CSV 文件")
-                        return
-                    
-                    # 读取每个 Excel 文件
-                    for file_name in excel_files:
-                        file_path = os.path.join(temp_dir, file_name)
-                        try:
-                            if file_name.endswith('.xlsx'):
-                                df = _read_excel_cached(file_path, engine='openpyxl')
-                            elif file_name.endswith('.xls'):
-                                df = _read_excel_cached(file_path, engine='xlrd')
-                            elif file_name.endswith('.csv'):
-                                df = pd.read_csv(file_path)
-                            df['时间'] = os.path.splitext(file_name)[0]
-                            df = process_price_columns(df)
-                            df_list.append(df)
-                        except Exception as e:
-                            st.error(f"读取文件 {file_name} 失败：{e}")
-                            continue
-                    
-                    if df_list:
-                        merged_df = pd.concat(df_list, ignore_index=True)
-                        merged_df = merged_df.loc[:, ~merged_df.columns.duplicated()]
-                        
-                        buffer = io.BytesIO()
-                        merged_df.to_excel(buffer, index=False, engine='openpyxl')
-                        buffer.seek(0)
-                        st.download_button(
-                            label="下载合并后的文件",
-                            data=buffer,
-                            file_name=os.path.basename(save_filename),
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key="download_merged"
-                        )
-                        st.success(f"表格已成功合并，可通过下载按钮获取文件")
-                        if st.checkbox("保存到 /tmp 目录", key="save_merged"):
-                            merged_df.to_excel(save_path, index=False, engine='openpyxl')
-                            st.success(f"文件已保存到 {save_path}")
-                    else:
-                        st.warning("没有可合并的数据")
-            except Exception as e:
-                st.error(f"处理压缩文件或合并文件时发生错误：{e}")
 
 # 处理价格列
 def process_price_columns(df):
@@ -133,49 +50,224 @@ def process_price_columns(df):
         df[column] = df[column].apply(extract_price)
     return df
 
-# 搜索流量洞察功能（仅生成源数据工作表）
-def search_insight_app():
-    with st.expander("SI-搜索流量洞察", expanded=False):
-        st.header("搜索流量洞察")
-        
-        # 模板下载
-        st.subheader("模板下载")
-        template_df = pd.DataFrame(columns=["搜索词", "搜索量", "品牌名称"])
-        buffer = io.BytesIO()
-        template_df.to_excel(buffer, index=False)
-        buffer.seek(0)
-        st.download_button(
-            label="下载模板",
-            data=buffer,
-            file_name="template.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="download_template"
+# 合并数据表格功能
+def merge_data_app():
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #00a6e4 0%, #0088c2 100%); padding: 2rem; border-radius: 10px; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h2 style="color: white; margin: 0; display: flex; align-items: center;">
+            📊 MI/SI - 合并数据表格
+        </h2>
+        <p style="color: rgba(255,255,255,0.9); margin-top: 0.5rem;">将多个Excel文件合并为一个统一的数据表格</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown("#### 📁 上传文件")
+        uploaded_file = st.file_uploader(
+            "选择一个 .zip 文件(包含需要合并的 Excel 文件)", 
+            type=["zip"], 
+            accept_multiple_files=False, 
+            key="merge_files",
+            help="支持包含.xlsx、.xls、.csv格式的ZIP压缩包"
         )
+    
+    with col2:
+        st.markdown("#### 💾 输出设置")
+        save_filename = st.text_input(
+            "输出文件名", 
+            value="merged_output.xlsx",
+            key="merge_save",
+            help="请输入合并后的文件名"
+        )
+    
+    st.markdown("---")
+    
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 2])
+    with col_btn1:
+        execute_btn = st.button("🚀 开始合并", key="merge_button", use_container_width=True)
+    
+    if execute_btn:
+        if not uploaded_file or not save_filename:
+            st.warning("⚠️ 请确保已选择 .zip 文件并输入文件名")
+            return
         
-        # 数据文件上传
-        uploaded_file = st.file_uploader("选择数据文件", type=["xlsx", "xls"], key="data_file")
-        save_filename = st.text_input("请输入输出文件名（例如：result.xlsx）", key="save_folder")
-        
-        # 输入产品参数（可选）
-        st.subheader("输入产品参数（可选）")
-        param_names = st.text_input("参数名（用逗号分隔，如 颜色,尺寸，可留空）", key="param_names")
-        param_values = st.text_area("具体参数（每行一个参数组，用逗号分隔，如 红,蓝\n小,大，可留空）", key="param_values")
-        
-        if st.button("执行", key="execute_button"):
-            if not uploaded_file or not save_filename:
-                st.warning("请确保已上传数据文件并输入输出文件名")
-                return
-            
+        with st.spinner("🔄 正在处理文件，请稍候..."):
             save_path = unique_tmp_path(save_filename)
             
             try:
-                # 读取输入数据
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    df_list = []
+                    
+                    file_extension = os.path.splitext(uploaded_file.name)[1].lower()
+                    temp_file_path = os.path.join(temp_dir, uploaded_file.name)
+                    
+                    with open(temp_file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    
+                    if file_extension == '.zip':
+                        with zipfile.ZipFile(temp_file_path, 'r') as zip_ref:
+                            zip_ref.extractall(temp_dir)
+                    
+                    excel_files = [f for f in os.listdir(temp_dir) if f.endswith(('.xlsx', '.xls', '.csv'))]
+                    
+                    if not excel_files:
+                        st.warning("📂 压缩文件中未找到任何 Excel 或 CSV 文件")
+                        return
+                    
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    
+                    for idx, file_name in enumerate(excel_files):
+                        file_path = os.path.join(temp_dir, file_name)
+                        try:
+                            status_text.text(f"正在处理: {file_name} ({idx+1}/{len(excel_files)})")
+                            
+                            if file_name.endswith('.xlsx'):
+                                df = _read_excel_cached(file_path, engine='openpyxl')
+                            elif file_name.endswith('.xls'):
+                                df = _read_excel_cached(file_path, engine='xlrd')
+                            elif file_name.endswith('.csv'):
+                                df = pd.read_csv(file_path)
+                            
+                            df['时间'] = os.path.splitext(file_name)[0]
+                            df = process_price_columns(df)
+                            df_list.append(df)
+                            
+                            progress_bar.progress((idx + 1) / len(excel_files))
+                        except Exception as e:
+                            st.error(f"❌ 读取文件 {file_name} 失败:{e}")
+                            continue
+                    
+                    status_text.empty()
+                    progress_bar.empty()
+                    
+                    if df_list:
+                        merged_df = pd.concat(df_list, ignore_index=True)
+                        merged_df = merged_df.loc[:, ~merged_df.columns.duplicated()]
+                        
+                        buffer = io.BytesIO()
+                        merged_df.to_excel(buffer, index=False, engine='openpyxl')
+                        buffer.seek(0)
+                        
+                        st.success(f"✅ 成功合并 {len(df_list)} 个文件，共 {len(merged_df)} 行数据")
+                        
+                        col_download, col_save = st.columns(2)
+                        with col_download:
+                            st.download_button(
+                                label="📥 下载合并后的文件",
+                                data=buffer,
+                                file_name=os.path.basename(save_filename),
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key="download_merged",
+                                use_container_width=True
+                            )
+                        with col_save:
+                            if st.checkbox("💾 同时保存到 /tmp 目录", key="save_merged"):
+                                merged_df.to_excel(save_path, index=False, engine='openpyxl')
+                                st.info(f"📁 文件已保存到 {save_path}")
+                    else:
+                        st.warning("⚠️ 没有可合并的数据")
+            except Exception as e:
+                st.error(f"❌ 处理压缩文件或合并文件时发生错误:{e}")
+
+# 搜索流量洞察功能(仅生成源数据工作表)
+def search_insight_app():
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #00a6e4 0%, #0088c2 100%); padding: 2rem; border-radius: 10px; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h2 style="color: white; margin: 0; display: flex; align-items: center;">
+            🔍 SI - 搜索流量洞察
+        </h2>
+        <p style="color: rgba(255,255,255,0.9); margin-top: 0.5rem;">分析搜索关键词，识别品牌词与非品牌词</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 模板下载区域
+    st.markdown("#### 📋 步骤 1: 下载数据模板")
+    template_df = pd.DataFrame(columns=["搜索词", "搜索量", "品牌名称"])
+    buffer = io.BytesIO()
+    template_df.to_excel(buffer, index=False)
+    buffer.seek(0)
+    
+    col_template1, col_template2, col_template3 = st.columns([1, 1, 2])
+    with col_template1:
+        st.download_button(
+            label="📥 下载Excel模板",
+            data=buffer,
+            file_name="template.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="download_template",
+            use_container_width=True
+        )
+    
+    st.markdown("---")
+    
+    # 数据上传区域
+    st.markdown("#### 📤 步骤 2: 上传填写好的数据文件")
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        uploaded_file = st.file_uploader(
+            "选择数据文件", 
+            type=["xlsx", "xls"], 
+            key="data_file",
+            help="请上传按模板填写的Excel文件"
+        )
+    
+    with col2:
+        save_filename = st.text_input(
+            "输出文件名", 
+            value="search_insight_result.xlsx",
+            key="save_folder",
+            help="请输入输出文件名"
+        )
+    
+    st.markdown("---")
+    
+    # 产品参数输入
+    st.markdown("#### ⚙️ 步骤 3: 输入产品参数(可选)")
+    
+    col_param1, col_param2 = st.columns(2)
+    with col_param1:
+        param_names = st.text_input(
+            "参数名(用逗号分隔)", 
+            placeholder="例如: 颜色,尺寸,材质",
+            key="param_names",
+            help="输入需要分析的产品参数名称"
+        )
+    
+    with col_param2:
+        param_values = st.text_area(
+            "具体参数(每行一个参数组,用逗号分隔)", 
+            placeholder="例如:\n红,蓝,绿\n小,中,大",
+            key="param_values",
+            help="每行对应一个参数的所有可能值",
+            height=100
+        )
+    
+    st.markdown("---")
+    
+    # 执行按钮
+    col_exec1, col_exec2, col_exec3 = st.columns([1, 1, 2])
+    with col_exec1:
+        execute_btn = st.button("🚀 开始分析", key="execute_button", use_container_width=True)
+    
+    if execute_btn:
+        if not uploaded_file or not save_filename:
+            st.warning("⚠️ 请确保已上传数据文件并输入输出文件名")
+            return
+        
+        with st.spinner("🔄 正在分析数据，请稍候..."):
+            save_path = unique_tmp_path(save_filename)
+            
+            try:
                 df = _read_excel_cached(uploaded_file)
                 if df.empty:
-                    st.warning("上传的文件为空，请检查数据文件")
+                    st.warning("📂 上传的文件为空，请检查数据文件")
                     return
                 
-                # 处理产品参数（支持中英文逗号）
+                # 处理产品参数(支持中英文逗号)
                 product_parameters = []
                 if param_names and param_values:
                     param_names_list = [name.strip() for name in re.split(r'[,\uff0c]', param_names) if name.strip()]
@@ -197,7 +289,12 @@ def search_insight_app():
                 translator_punct = str.maketrans('', '', '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~')
                 
                 # 处理搜索词
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
                 for index, row in df.iterrows():
+                    status_text.text(f"正在分析第 {index+1}/{len(df)} 条数据...")
+                    
                     search_word = str(row['搜索词']).lower()
                     search_volumn = row['搜索量'] if pd.notna(row['搜索量']) else 0
                     
@@ -233,10 +330,15 @@ def search_insight_app():
                             brand_words_list.append({'品牌名称': brand, '搜索量': search_volumn})
                     else:
                         results.append('Non-Branded KWs')
+                    
+                    progress_bar.progress((index + 1) / len(df))
                 
                 df['词性'] = results
                 
-                # 保存到 Excel（仅源数据工作表）
+                status_text.empty()
+                progress_bar.empty()
+                
+                # 保存到 Excel(仅源数据工作表)
                 workbook = Workbook()
                 if "Sheet" in workbook.sheetnames:
                     workbook.remove(workbook["Sheet"])
@@ -249,26 +351,32 @@ def search_insight_app():
                 output_filename = f"result_{timestamp}.xlsx"
                 output_path = os.path.join("/tmp", output_filename)
                 
-                # 保存工作簿到缓冲区以供下载
                 buffer = io.BytesIO()
                 workbook.save(buffer)
                 buffer.seek(0)
                 
-                # 提供下载链接
-                st.download_button(
-                    label="下载处理结果",
-                    data=buffer,
-                    file_name=output_filename,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="download_result"
-                )
-                st.success(f"数据处理完成，可通过下载按钮获取文件")
-                if st.checkbox("保存到 /tmp 目录", key="save_result"):
-                    workbook.save(output_path)
-                    st.success(f"文件已保存到 {output_path}")
+                branded_count = results.count('Branded KWs')
+                non_branded_count = results.count('Non-Branded KWs')
+                
+                st.success(f"✅ 分析完成! 品牌词: {branded_count} 条 | 非品牌词: {non_branded_count} 条")
+                
+                col_download, col_save = st.columns(2)
+                with col_download:
+                    st.download_button(
+                        label="📥 下载处理结果",
+                        data=buffer,
+                        file_name=output_filename,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="download_result",
+                        use_container_width=True
+                    )
+                with col_save:
+                    if st.checkbox("💾 同时保存到 /tmp 目录", key="save_result"):
+                        workbook.save(output_path)
+                        st.info(f"📁 文件已保存到 {output_path}")
             
             except Exception as e:
-                st.error(f"处理数据时发生错误：{e}")
+                st.error(f"❌ 处理数据时发生错误:{e}")
 
 # 搜索流量洞察可视化功能
 def aggregate_top_n(df, value_col, name_col, top_n=10):
@@ -290,7 +398,6 @@ def aggregate_top_n(df, value_col, name_col, top_n=10):
 def pie_chart(df, value_col, name_col, title):
     df = df.copy()
 
-    # 控制分类顺序，确保 Others 在最后
     df[name_col] = df[name_col].astype(str)
     df = df.sort_values(by=value_col, ascending=False).reset_index(drop=True)
     if 'Others' in df[name_col].values:
@@ -300,18 +407,9 @@ def pie_chart(df, value_col, name_col, title):
         df[name_col] = pd.Categorical(df[name_col], ordered=True)
     
     business_palette = [
-    "#4C8EDA",  # 明亮企业蓝
-    "#FFA14E",  # 活力商务橙
-    "#F25C5C",  # 鲜红但不刺眼
-    "#6BD0C1",  # 清新青绿
-    "#58C27D",  # 明亮草绿
-    "#F7C948",  # 金亮黄
-    "#B685D6",  # 浅亮紫
-    "#FF90B3",  # 高级粉红
-    "#BC8D6E",  # 奶咖棕
-    "#C9C9C9",  # 亮灰
-    "#81D3EB",  # 天蓝
-]
+        "#4C8EDA", "#FFA14E", "#F25C5C", "#6BD0C1", "#58C27D", "#F7C948",
+        "#B685D6", "#FF90B3", "#BC8D6E", "#C9C9C9", "#81D3EB"
+    ]
 
     fig = px.pie(
         df,
@@ -325,36 +423,61 @@ def pie_chart(df, value_col, name_col, title):
 
     fig.update_layout(
         height=900,
-        legend=dict(
-            orientation="v",
-            x=0.8,
-            y=0.5,
-            font=dict(size=16)
-        ),
+        legend=dict(orientation="v", x=0.8, y=0.5, font=dict(size=16)),
         margin=dict(l=20, r=150, t=50, b=50),
-        font=dict(size=16)  # 全局字体，包括饼图标签
+        font=dict(size=16)
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
 def search_insight_viz_app():
-    with st.expander("SI-搜索流量洞察：聚合和可视化", expanded=False):
-        st.header("搜索流量洞察：聚合和可视化")
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #00a6e4 0%, #0088c2 100%); padding: 2rem; border-radius: 10px; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h2 style="color: white; margin: 0; display: flex; align-items: center;">
+            📈 SI - 搜索流量洞察: 聚合和可视化
+        </h2>
+        <p style="color: rgba(255,255,255,0.9); margin-top: 0.5rem;">生成多维度数据分析报表和可视化图表</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-        uploaded_file = st.file_uploader("选择包含源数据的 Excel 文件(完成检查确认无误)", type=["xlsx", "xls"], key="viz_data_file")
-        save_filename = st.text_input("请输入输出文件名（例如：viz_result.xlsx）", key="viz_save_folder")
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown("#### 📁 上传源数据文件")
+        uploaded_file = st.file_uploader(
+            "选择包含源数据的 Excel 文件(完成检查确认无误)", 
+            type=["xlsx", "xls"], 
+            key="viz_data_file",
+            help="请上传包含'源数据'工作表的Excel文件"
+        )
+    
+    with col2:
+        st.markdown("#### 💾 输出设置")
+        save_filename = st.text_input(
+            "输出文件名", 
+            value="viz_result.xlsx",
+            key="viz_save_folder",
+            help="请输入输出文件名"
+        )
 
-        if st.button("执行可视化", key="viz_execute_button"):
-            if not uploaded_file or not save_filename:
-                st.warning("请确保已上传数据文件并输入输出文件名")
-                return
+    st.markdown("---")
+    
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 2])
+    with col_btn1:
+        execute_btn = st.button("🚀 开始可视化", key="viz_execute_button", use_container_width=True)
 
+    if execute_btn:
+        if not uploaded_file or not save_filename:
+            st.warning("⚠️ 请确保已上传数据文件并输入输出文件名")
+            return
+
+        with st.spinner("🔄 正在生成可视化报表，请稍候..."):
             save_path = unique_tmp_path(save_filename)
 
             try:
                 df = _read_excel_cached(uploaded_file, sheet_name='源数据')
                 if df.empty:
-                    st.warning("上传的文件为空或不包含‘源数据’工作表，请检查数据文件")
+                    st.warning("📂 上传的文件为空或不包含'源数据'工作表，请检查数据文件")
                     return
 
                 brand_words_list = []
@@ -415,87 +538,125 @@ def search_insight_viz_app():
                 timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
                 output_filename = f"viz_result_{timestamp}.xlsx"
                 output_path = os.path.join("/tmp", output_filename)
-                workbook.save(output_path)
 
                 buffer = io.BytesIO()
                 workbook.save(buffer)
                 buffer.seek(0)
 
-                st.subheader("数据可视化")
+                st.success("✅ 数据处理完成，正在生成可视化图表...")
+
+                st.markdown("### 📊 数据可视化")
 
                 if not brand_words_df.empty:
-                    pie_chart(brand_words_df, '搜索量', '品牌名称', "品牌词拆解")
+                    with st.container():
+                        pie_chart(brand_words_df, '搜索量', '品牌名称', "品牌词拆解")
 
                 for param_name, heats in param_heats.items():
                     if heats:
                         param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum()
                         param_df = aggregate_top_n(param_df, value_col='搜索量', name_col='参数值')
-                        pie_chart(param_df, '搜索量', '参数值', f"{param_name} 参数搜索量分布")
+                        with st.container():
+                            pie_chart(param_df, '搜索量', '参数值', f"{param_name} 参数搜索量分布")
 
                 if not df_selected.empty:
-                    pie_chart(df_selected, '搜索量', '词性', "流量结构")
+                    with st.container():
+                        pie_chart(df_selected, '搜索量', '词性', "流量结构")
 
-                st.download_button(
-                    label="下载处理结果",
-                    data=buffer,
-                    file_name=output_filename,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="viz_download_result"
-                )
-                st.success(f"数据处理和可视化完成，可通过下载按钮获取文件")
-                if st.checkbox("保存到 /tmp 目录", key="viz_save_result"):
-                    workbook.save(output_path)
-                    st.success(f"文件已保存到 {output_path}")
+                st.markdown("---")
+                
+                col_download, col_save = st.columns(2)
+                with col_download:
+                    st.download_button(
+                        label="📥 下载完整报表",
+                        data=buffer,
+                        file_name=output_filename,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="viz_download_result",
+                        use_container_width=True
+                    )
+                with col_save:
+                    if st.checkbox("💾 同时保存到 /tmp 目录", key="viz_save_result"):
+                        workbook.save(output_path)
+                        st.info(f"📁 文件已保存到 {output_path}")
 
             except Exception as e:
-                st.error(f"处理数据时发生错误：{e}")
+                st.error(f"❌ 处理数据时发生错误:{e}")
 
-# 新功能：删除第一行并重新打包ZIP
+# 新功能:删除第一行并重新打包ZIP
 def data_clean_app():
-    with st.expander("DC-数据清理：删除第一行", expanded=False):
-        st.header("数据清理：删除文件第一行并重新打包")
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #00a6e4 0%, #0088c2 100%); padding: 2rem; border-radius: 10px; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h2 style="color: white; margin: 0; display: flex; align-items: center;">
+            🧹 DC - 数据清理: 删除第一行
+        </h2>
+        <p style="color: rgba(255,255,255,0.9); margin-top: 0.5rem;">批量删除Excel/CSV文件的第一行数据并重新打包</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown("#### 📁 上传文件")
+        uploaded_file = st.file_uploader(
+            "选择一个 .zip 文件(包含 XLSX 或 CSV 文件)", 
+            type=["zip"], 
+            accept_multiple_files=False, 
+            key="clean_files",
+            help="支持包含.xlsx、.xls、.csv格式的ZIP压缩包"
+        )
+    
+    with col2:
+        st.markdown("#### 💾 输出设置")
+        output_filename = st.text_input(
+            "输出文件名", 
+            value="cleaned_files.zip", 
+            key="clean_save",
+            help="请输入输出ZIP文件名"
+        )
+    
+    st.markdown("---")
+    
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 2])
+    with col_btn1:
+        execute_btn = st.button("🚀 开始清理", key="clean_button", use_container_width=True)
+    
+    if execute_btn:
+        if not uploaded_file or not output_filename:
+            st.warning("⚠️ 请确保已选择 .zip 文件并输入输出文件名")
+            return
         
-        uploaded_file = st.file_uploader("选择一个 .zip 文件（包含 XLSX 或 CSV 文件）", type=["zip"], accept_multiple_files=False, key="clean_files")
-        output_filename = st.text_input("请输入输出 ZIP 文件名（例如：cleaned.zip）", value="cleaned_files.zip", key="clean_save")
-        
-        if st.button("清理并打包", key="clean_button"):
-            if not uploaded_file or not output_filename:
-                st.warning("请确保已选择 .zip 文件并输入输出文件名")
-                return
-            
+        with st.spinner("🔄 正在清理文件，请稍候..."):
             try:
-                # 创建临时目录用于解压和处理文件
                 with tempfile.TemporaryDirectory() as temp_dir:
-                    # 保存上传的ZIP文件
                     temp_zip_path = os.path.join(temp_dir, uploaded_file.name)
                     with open(temp_zip_path, "wb") as f:
                         f.write(uploaded_file.getbuffer())
                     
-                    # 解压ZIP
                     with zipfile.ZipFile(temp_zip_path, 'r') as zip_ref:
                         zip_ref.extractall(temp_dir)
                     
-                    # 获取所有XLSX和CSV文件
                     data_files = [f for f in os.listdir(temp_dir) if f.endswith(('.xlsx', '.xls', '.csv'))]
                     
                     if not data_files:
-                        st.warning("压缩文件中未找到任何 XLSX、XLS 或 CSV 文件")
+                        st.warning("📂 压缩文件中未找到任何 XLSX、XLS 或 CSV 文件")
                         return
                     
-                    # 处理每个文件：删除第一行
                     processed_files = []
-                    for file_name in data_files:
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    
+                    for idx, file_name in enumerate(data_files):
                         file_path = os.path.join(temp_dir, file_name)
                         try:
+                            status_text.text(f"正在处理: {file_name} ({idx+1}/{len(data_files)})")
+                            
                             if file_name.endswith(('.xlsx', '.xls')):
                                 df = pd.read_excel(file_path, engine='openpyxl' if file_name.endswith('.xlsx') else 'xlrd')
                             elif file_name.endswith('.csv'):
                                 df = pd.read_csv(file_path)
                             
-                            # 删除第一行（假设第一行是索引0）
                             df = df.iloc[1:].reset_index(drop=True)
                             
-                            # 保存处理后的文件到临时目录，使用原文件名
                             processed_path = os.path.join(temp_dir, f"cleaned_{file_name}")
                             if file_name.endswith(('.xlsx', '.xls')):
                                 df.to_excel(processed_path, index=False, engine='openpyxl')
@@ -503,133 +664,256 @@ def data_clean_app():
                                 df.to_csv(processed_path, index=False)
                             
                             processed_files.append(processed_path)
+                            progress_bar.progress((idx + 1) / len(data_files))
                         except Exception as e:
-                            st.error(f"处理文件 {file_name} 失败：{e}")
+                            st.error(f"❌ 处理文件 {file_name} 失败:{e}")
                             continue
                     
+                    status_text.empty()
+                    progress_bar.empty()
+                    
                     if processed_files:
-                        # 创建新的ZIP缓冲区
                         buffer = io.BytesIO()
                         with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as new_zip:
                             for proc_path in processed_files:
-                                arcname = os.path.basename(proc_path).replace("cleaned_", "")  # 移除'cleaned_'前缀，保持原名
+                                arcname = os.path.basename(proc_path).replace("cleaned_", "")
                                 new_zip.write(proc_path, arcname=arcname)
                         
                         buffer.seek(0)
                         
-                        # 提供下载
+                        st.success(f"✅ 成功清理 {len(processed_files)} 个文件")
+                        
                         st.download_button(
-                            label="下载清理后的 ZIP 文件",
+                            label="📥 下载清理后的 ZIP 文件",
                             data=buffer,
                             file_name=output_filename,
                             mime="application/zip",
-                            key="download_cleaned"
+                            key="download_cleaned",
+                            use_container_width=True
                         )
-                        st.success("文件已清理并重新打包，可通过下载按钮获取")
                     else:
-                        st.warning("没有可清理的文件")
+                        st.warning("⚠️ 没有可清理的文件")
             except Exception as e:
-                st.error(f"处理 ZIP 文件时发生错误：{e}")
+                st.error(f"❌ 处理 ZIP 文件时发生错误:{e}")
 
 # 主应用程序
 def main():
-    st.set_page_config(page_title=APP_CONFIG["app_title"], layout="wide")
+    st.set_page_config(
+        page_title=APP_CONFIG["app_title"], 
+        layout="wide",
+        page_icon="📊",
+        initial_sidebar_state="collapsed"
+    )
     
-    # 自定义CSS优化UI，主色调 #00a6e4
+    # 自定义CSS优化UI,主色调 #00a6e4
     st.markdown("""
     <style>
         /* 全局字体和背景 */
-        body {
-            font-family: 'Arial', sans-serif;
-            background-color: #f9f9f9;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        html, body, [class*="css"] {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+        }
+        
+        .main {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
         }
         
         /* 标题颜色 */
         h1, h2, h3, h4, h5, h6 {
             color: #00a6e4 !important;
+            font-weight: 600 !important;
         }
         
         /* 按钮样式 */
         .stButton > button {
-            background-color: #00a6e4;
+            background: linear-gradient(135deg, #00a6e4 0%, #0088c2 100%);
             color: white;
             border: none;
-            border-radius: 4px;
-            padding: 0.5rem 1rem;
-            font-weight: bold;
-            transition: background-color 0.3s;
+            border-radius: 8px;
+            padding: 0.6rem 1.5rem;
+            font-weight: 600;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 166, 228, 0.2);
         }
         
         .stButton > button:hover {
-            background-color: #0088c2;
-            color: white;
+            background: linear-gradient(135deg, #0088c2 0%, #006a99 100%);
+            box-shadow: 0 6px 12px rgba(0, 166, 228, 0.3);
+            transform: translateY(-2px);
         }
         
         /* 下载按钮样式 */
         .stDownloadButton > button {
-            background-color: #00a6e4;
+            background: linear-gradient(135deg, #00a6e4 0%, #0088c2 100%);
             color: white;
             border: none;
-            border-radius: 4px;
-            padding: 0.5rem 1rem;
-            font-weight: bold;
-            transition: background-color 0.3s;
+            border-radius: 8px;
+            padding: 0.6rem 1.5rem;
+            font-weight: 600;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 166, 228, 0.2);
         }
         
         .stDownloadButton > button:hover {
-            background-color: #0088c2;
-            color: white;
+            background: linear-gradient(135deg, #0088c2 0%, #006a99 100%);
+            box-shadow: 0 6px 12px rgba(0, 166, 228, 0.3);
+            transform: translateY(-2px);
         }
         
-        /* Expander 样式 */
-        .streamlit-expanderHeader {
-            background-color: #e6f7ff;
-            border: 1px solid #00a6e4;
-            border-radius: 4px;
-            color: #00a6e4;
-            font-weight: bold;
+        /* 文件上传器样式 */
+        .stFileUploader {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        [data-testid="stFileUploadDropzone"] {
+            border: 2px dashed #00a6e4;
+            border-radius: 8px;
+            background: #f8fcff;
         }
         
         /* 输入框样式 */
-        .stTextInput > div > div > input {
-            border: 1px solid #00a6e4;
-            border-radius: 4px;
-        }
-        
+        .stTextInput > div > div > input,
         .stTextArea > div > div > textarea {
-            border: 1px solid #00a6e4;
-            border-radius: 4px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 0.6rem;
+            transition: all 0.3s ease;
+            font-size: 14px;
         }
         
-        /* 侧边栏（如果有） */
-        .css-1aumxhk {
-            background-color: #e6f7ff;
+        .stTextInput > div > div > input:focus,
+        .stTextArea > div > div > textarea:focus {
+            border-color: #00a6e4;
+            box-shadow: 0 0 0 3px rgba(0, 166, 228, 0.1);
         }
         
-        /* 警告和成功消息 */
-        .stAlert {
-            border-radius: 4px;
+        /* 进度条样式 */
+        .stProgress > div > div > div > div {
+            background: linear-gradient(90deg, #00a6e4 0%, #0088c2 100%);
+        }
+        
+        /* 成功/错误/警告消息样式 */
+        .stSuccess {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border-left: 4px solid #28a745;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        
+        .stError {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            border-left: 4px solid #dc3545;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        
+        .stWarning {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border-left: 4px solid #ffc107;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        
+        .stInfo {
+            background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+            border-left: 4px solid #00a6e4;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        
+        /* 复选框样式 */
+        .stCheckbox {
+            font-size: 14px;
+        }
+        
+        /* 分隔线样式 */
+        hr {
+            margin: 2rem 0;
+            border: none;
+            border-top: 2px solid #e0e0e0;
+        }
+        
+        /* 卡片效果 */
+        div[data-testid="column"] {
+            background: white;
+            padding: 1rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        /* Plotly图表容器 */
+        .js-plotly-plot {
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
     </style>
     """, unsafe_allow_html=True)
     
-    st.title(APP_CONFIG["app_title"])
+    # 页面头部
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #00a6e4 0%, #0088c2 100%); padding: 2.5rem 2rem; border-radius: 15px; margin-bottom: 2rem; box-shadow: 0 8px 16px rgba(0,0,0,0.15);">
+        <h1 style="color: white; margin: 0; font-size: 2.5rem; font-weight: 700;">
+            📊 市场洞察小程序
+        </h1>
+        <div style="display: flex; gap: 2rem; margin-top: 1rem; flex-wrap: wrap;">
+            <span style="color: rgba(255,255,255,0.95); font-size: 14px;">
+                <strong>版本:</strong> v1.2.0
+            </span>
+            <span style="color: rgba(255,255,255,0.95); font-size: 14px;">
+                <strong>作者:</strong> 海翼IDC团队
+            </span>
+            <span style="color: rgba(255,255,255,0.95); font-size: 14px;">
+                <strong>公司:</strong> Anker Oceanwing Inc.
+            </span>
+            <span style="color: rgba(255,255,255,0.95); font-size: 14px;">
+                <strong>联系:</strong> idc@oceanwing.com
+            </span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Display app configuration
-    st.markdown(f"""
-    **版本**: {APP_CONFIG["version"]}  
-    **作者**: {APP_CONFIG["author"]}  
-    **公司**: {APP_CONFIG["company"]}  
-    **联系方式**: {APP_CONFIG["contact"]}  
-    """)
+    # 功能导航
+    st.markdown("""
+    <div style="background: white; padding: 1.5rem; border-radius: 10px; margin-bottom: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+        <h3 style="margin-top: 0; color: #333;">🎯 功能导航</h3>
+        <p style="color: #666; margin-bottom: 0;">选择下方功能模块开始您的数据分析之旅</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    st.header("功能选择")
-    st.write("点击以下任一功能以展开操作界面：")
+    # 功能模块
+    tabs = st.tabs([
+        "📊 合并数据表格",
+        "🔍 搜索流量洞察",
+        "📈 流量可视化分析",
+        "🧹 数据清理工具"
+    ])
     
-    merge_data_app()
-    search_insight_app()
-    search_insight_viz_app()
-    data_clean_app()  # 添加新功能
+    with tabs[0]:
+        merge_data_app()
+    
+    with tabs[1]:
+        search_insight_app()
+    
+    with tabs[2]:
+        search_insight_viz_app()
+    
+    with tabs[3]:
+        data_clean_app()
+    
+    # 页脚
+    st.markdown("---")
+    st.markdown("""
+    <div style="text-align: center; color: #666; padding: 2rem 0;">
+        <p style="margin: 0;">© 2024 Anker Oceanwing Inc. | 海翼IDC团队</p>
+        <p style="margin: 0.5rem 0 0 0; font-size: 13px;">市场洞察小程序 v1.2.0 - 让数据分析更简单</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
