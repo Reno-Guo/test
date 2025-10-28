@@ -144,8 +144,16 @@ def merge_data_app():
                     progress_bar.empty()
                     
                     if df_list:
+                        # 添加合并进度条
+                        merge_progress = st.progress(0)
+                        merge_status = st.empty()
+                        merge_status.text("正在合并数据...")
                         merged_df = pd.concat(df_list, ignore_index=True)
                         merged_df = merged_df.loc[:, ~merged_df.columns.duplicated()]
+                        merge_progress.progress(1.0)
+                        merge_status.text("合并完成")
+                        merge_progress.empty()
+                        merge_status.empty()
                         
                         buffer = io.BytesIO()
                         merged_df.to_excel(buffer, index=False, engine='openpyxl')
@@ -338,6 +346,12 @@ def search_insight_app():
                 status_text.empty()
                 progress_bar.empty()
                 
+                # 添加保存进度条
+                save_progress = st.progress(0)
+                save_status = st.empty()
+                save_status.text("正在保存到Excel...")
+                save_progress.progress(0.5)
+                
                 # 保存到 Excel(仅源数据工作表)
                 workbook = Workbook()
                 if "Sheet" in workbook.sheetnames:
@@ -354,6 +368,10 @@ def search_insight_app():
                 buffer = io.BytesIO()
                 workbook.save(buffer)
                 buffer.seek(0)
+                save_progress.progress(1.0)
+                save_status.text("保存完成")
+                save_progress.empty()
+                save_status.empty()
                 
                 branded_count = results.count('Branded KWs')
                 non_branded_count = results.count('Non-Branded KWs')
@@ -480,6 +498,10 @@ def search_insight_viz_app():
                     st.warning("📂 上传的文件为空或不包含'源数据'工作表，请检查数据文件")
                     return
 
+                # 添加品牌词处理进度条
+                brand_progress = st.progress(0)
+                brand_status = st.empty()
+                brand_status.text("正在处理品牌词...")
                 brand_words_list = []
                 for index, row in df.iterrows():
                     search_volumn = row['搜索量'] if pd.notna(row['搜索量']) else 0
@@ -488,23 +510,41 @@ def search_insight_viz_app():
                     for brand in matched_brands:
                         if brand:
                             brand_words_list.append({'品牌名称': brand, '搜索量': search_volumn})
-
+                    if index % max(1, len(df) // 10) == 0 or index == len(df) - 1:
+                        brand_progress.progress((index + 1) / len(df))
                 brand_words_df = pd.DataFrame(brand_words_list)
                 if not brand_words_df.empty:
                     brand_words_df = brand_words_df.groupby('品牌名称', as_index=False)['搜索量'].sum()
                     brand_words_df = aggregate_top_n(brand_words_df, value_col='搜索量', name_col='品牌名称')
+                brand_status.text("品牌词处理完成")
+                brand_progress.empty()
+                brand_status.empty()
 
+                # 添加参数热图处理进度条
+                param_progress = st.progress(0)
+                param_status = st.empty()
+                param_status.text("正在处理参数...")
                 param_heats = {}
-                for column in df.columns:
-                    if column not in ['搜索词', '搜索量', '品牌名称', '品牌', '特性参数', '词性']:
-                        param_heats[column] = []
-                        for index, row in df.iterrows():
-                            search_volumn = row['搜索量'] if pd.notna(row['搜索量']) else 0
-                            param_value = str(row[column]) if not pd.isna(row[column]) else ''
-                            matched_values = param_value.split(',') if param_value else []
-                            for param in matched_values:
-                                if param:
-                                    param_heats[column].append({'参数值': param, '搜索量': search_volumn})
+                param_columns = [col for col in df.columns if col not in ['搜索词', '搜索量', '品牌名称', '品牌', '特性参数', '词性']]
+                for col_idx, column in enumerate(param_columns):
+                    param_heats[column] = []
+                    for index, row in df.iterrows():
+                        search_volumn = row['搜索量'] if pd.notna(row['搜索量']) else 0
+                        param_value = str(row[column]) if not pd.isna(row[column]) else ''
+                        matched_values = param_value.split(',') if param_value else []
+                        for param in matched_values:
+                            if param:
+                                param_heats[column].append({'参数值': param, '搜索量': search_volumn})
+                    param_progress.progress((col_idx + 1) / len(param_columns))
+                param_status.text("参数处理完成")
+                param_progress.empty()
+                param_status.empty()
+
+                # 添加工作簿保存进度条
+                save_progress = st.progress(0)
+                save_status = st.empty()
+                save_status.text("正在生成Excel工作簿...")
+                save_progress.progress(0.3)
 
                 workbook = Workbook()
                 if "Sheet" in workbook.sheetnames:
@@ -513,13 +553,15 @@ def search_insight_viz_app():
                 ws_source = workbook.create_sheet('源数据')
                 for r in dataframe_to_rows(df, index=False, header=True):
                     ws_source.append(r)
+                save_progress.progress(0.6)
 
                 if not brand_words_df.empty:
                     ws_brands = workbook.create_sheet('品牌词拆解')
                     for r in dataframe_to_rows(brand_words_df, index=False, header=True):
                         ws_brands.append(r)
+                save_progress.progress(0.7)
 
-                for param_name, heats in param_heats.items():
+                for param_idx, (param_name, heats) in enumerate(param_heats.items()):
                     if heats:
                         param_df = pd.DataFrame(heats).groupby('参数值', as_index=False)['搜索量'].sum()
                         param_df = aggregate_top_n(param_df, value_col='搜索量', name_col='参数值')
@@ -527,6 +569,9 @@ def search_insight_viz_app():
                         ws_param = workbook.create_sheet(f"{clean_sheet_name}拆解")
                         for r in dataframe_to_rows(param_df, index=False, header=True):
                             ws_param.append(r)
+                    if param_idx % max(1, len(param_heats) // 5) == 0 or param_idx == len(param_heats) - 1:
+                        save_progress.progress(0.7 + (0.3 * (param_idx + 1) / len(param_heats)))
+                save_progress.progress(1.0)
 
                 df_selected = df[['词性', '搜索量']].groupby('词性').sum().reset_index()
                 if not df_selected.empty:
@@ -542,6 +587,9 @@ def search_insight_viz_app():
                 buffer = io.BytesIO()
                 workbook.save(buffer)
                 buffer.seek(0)
+                save_status.text("工作簿生成完成")
+                save_progress.empty()
+                save_status.empty()
 
                 st.success("✅ 数据处理完成，正在生成可视化图表...")
 
@@ -673,13 +721,20 @@ def data_clean_app():
                     progress_bar.empty()
                     
                     if processed_files:
+                        # 添加打包进度条
+                        zip_progress = st.progress(0)
+                        zip_status = st.empty()
+                        zip_status.text("正在打包ZIP文件...")
                         buffer = io.BytesIO()
                         with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as new_zip:
-                            for proc_path in processed_files:
+                            for proc_idx, proc_path in enumerate(processed_files):
                                 arcname = os.path.basename(proc_path).replace("cleaned_", "")
                                 new_zip.write(proc_path, arcname=arcname)
-                        
+                                zip_progress.progress((proc_idx + 1) / len(processed_files))
                         buffer.seek(0)
+                        zip_status.text("打包完成")
+                        zip_progress.empty()
+                        zip_status.empty()
                         
                         st.success(f"✅ 成功清理 {len(processed_files)} 个文件")
                         
