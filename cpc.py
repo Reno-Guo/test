@@ -206,6 +206,7 @@ with tab2:
     with col2:
         st.markdown("#### 文件2：竞价数据")
         st.markdown("需要包含的列：")
+        st.markdown("- 关键词列（用于匹配文件1）")
         st.markdown("- 建议竞价-推荐列（对应推荐CPC）")
         st.markdown("- 建议竞价-最高列（对应最高CPC）")
         
@@ -299,56 +300,53 @@ with tab2:
                 df1_filtered = df1[[keyword_col, rank_col]].copy()
                 df1_filtered.columns = ['keyword', 'aba_rank']
                 
-                df2_filtered = df2[[rec_cpc_col, max_cpc_col]].copy()
-                df2_filtered.columns = ['recommended_cpc', 'max_cpc']
+                df2_filtered = df2[[keyword_col_2, rec_cpc_col, max_cpc_col]].copy()
+                df2_filtered.columns = ['keyword', 'recommended_cpc', 'max_cpc']
                 
                 # 清理数据
                 df1_filtered = df1_filtered.dropna()
                 df2_filtered = df2_filtered.dropna()
                 
-                # 确保数据行数一致
-                min_rows = min(len(df1_filtered), len(df2_filtered))
-                df1_filtered = df1_filtered.head(min_rows).reset_index(drop=True)
-                df2_filtered = df2_filtered.head(min_rows).reset_index(drop=True)
+                # 去重处理
+                df1_filtered = df1_filtered.drop_duplicates(subset='keyword', keep='first')
+                df2_filtered = df2_filtered.drop_duplicates(subset='keyword', keep='first')
                 
-                # 合并数据
-                merged_df = pd.concat([df1_filtered, df2_filtered], axis=1)
+                # 通过关键词列进行内连接（只保留两个文件都有的关键词）
+                merged_df = pd.merge(df1_filtered, df2_filtered, on='keyword', how='inner')
                 
-                # 转换数据类型
-                try:
-                    merged_df['aba_rank'] = pd.to_numeric(merged_df['aba_rank'], errors='coerce')
-                    merged_df['recommended_cpc'] = pd.to_numeric(merged_df['recommended_cpc'], errors='coerce')
-                    merged_df['max_cpc'] = pd.to_numeric(merged_df['max_cpc'], errors='coerce')
+                if len(merged_df) == 0:
+                    st.error("❌ 两个文件没有匹配的关键词！请检查关键词列是否正确。")
+                else:
+                    # 显示匹配信息
+                    st.info(f"📊 文件1共 {len(df1_filtered)} 个关键词，文件2共 {len(df2_filtered)} 个关键词，成功匹配 {len(merged_df)} 个关键词")
                     
-                    # 移除无效数据
-                    merged_df = merged_df.dropna()
-                    merged_df = merged_df[merged_df['aba_rank'] > 0]
-                    
-                    # 去重处理：如果关键词重复，保留第一条
-                    original_count = len(merged_df)
-                    merged_df = merged_df.drop_duplicates(subset='keyword', keep='first')
-                    duplicate_count = original_count - len(merged_df)
-                    
-                    if duplicate_count > 0:
-                        st.warning(f"⚠️ 检测到 {duplicate_count} 个重复关键词，已自动去重")
-                    
-                    if len(merged_df) == 0:
-                        st.error("❌ 没有有效的数据可以计算！请检查文件内容。")
-                    else:
-                        # 显示合并后的数据预览
-                        st.markdown("### 📊 合并后的数据预览")
-                        st.dataframe(merged_df.head(20), use_container_width=True)
-                        st.info(f"共读取 {len(merged_df)} 条有效数据")
+                    # 转换数据类型
+                    try:
+                        merged_df['aba_rank'] = pd.to_numeric(merged_df['aba_rank'], errors='coerce')
+                        merged_df['recommended_cpc'] = pd.to_numeric(merged_df['recommended_cpc'], errors='coerce')
+                        merged_df['max_cpc'] = pd.to_numeric(merged_df['max_cpc'], errors='coerce')
                         
-                        # 转换为列表格式进行计算
-                        keywords_list = merged_df.to_dict('records')
-                        calculate_and_display(keywords_list)
-                
-                except Exception as e:
-                    st.error(f"❌ 数据处理错误：{str(e)}")
-                    st.markdown("请确保：")
-                    st.markdown("- 周搜索排名列包含有效的数字")
-                    st.markdown("- 竞价列包含有效的数字")
+                        # 移除无效数据
+                        merged_df = merged_df.dropna()
+                        merged_df = merged_df[merged_df['aba_rank'] > 0]
+                        
+                        if len(merged_df) == 0:
+                            st.error("❌ 没有有效的数据可以计算！请检查数值列是否包含有效数字。")
+                        else:
+                            # 显示合并后的数据预览
+                            st.markdown("### 📊 匹配成功的数据预览")
+                            st.dataframe(merged_df.head(20), use_container_width=True)
+                            st.success(f"✅ 共 {len(merged_df)} 条有效数据用于计算")
+                            
+                            # 转换为列表格式进行计算
+                            keywords_list = merged_df.to_dict('records')
+                            calculate_and_display(keywords_list)
+                    
+                    except Exception as e:
+                        st.error(f"❌ 数据处理错误：{str(e)}")
+                        st.markdown("请确保：")
+                        st.markdown("- 周搜索排名列包含有效的数字")
+                        st.markdown("- 竞价列包含有效的数字")
         
         except Exception as e:
             st.error(f"❌ 文件读取错误：{str(e)}")
