@@ -7,6 +7,90 @@ st.set_page_config(page_title="CPC计算器", page_icon="💰", layout="wide")
 st.title("🔢 CPC计算器")
 st.markdown("**基于SIF关键词转化率的综合CPC计算工具**")
 
+# ==================== 计算和显示函数 ====================
+def calculate_and_display(keywords_list):
+    """计算并显示CPC结果"""
+    # 创建DataFrame
+    df = pd.DataFrame(keywords_list)
+    
+    # 计算价值分数 S = 1 / [ln(ABA_Rank)]²
+    df['score_S'] = 1 / (np.log(df['aba_rank']) ** 2)
+    
+    # 计算权重 W = S / ∑S
+    total_score = df['score_S'].sum()
+    df['weight_W'] = df['score_S'] / total_score
+    
+    # 计算加权CPC
+    df['weighted_rec_cpc'] = df['weight_W'] * df['recommended_cpc']
+    df['weighted_max_cpc'] = df['weight_W'] * df['max_cpc']
+    
+    # 计算综合CPC
+    comprehensive_rec_cpc = df['weighted_rec_cpc'].sum()
+    comprehensive_max_cpc = df['weighted_max_cpc'].sum()
+    
+    # 显示结果
+    st.success("✅ 计算完成！")
+    
+    # 显示综合CPC结果
+    st.markdown("## 📈 计算结果")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.metric(
+            label="基于推荐CPC的综合CPC",
+            value=f"${comprehensive_rec_cpc:.4f}"
+        )
+    
+    with col2:
+        st.metric(
+            label="基于最高CPC的综合CPC",
+            value=f"${comprehensive_max_cpc:.4f}"
+        )
+    
+    # 显示详细数据表格
+    st.markdown("## 📋 详细计算数据")
+    
+    # 准备显示的DataFrame
+    display_df = df.copy()
+    display_df['价值分数 (S)'] = display_df['score_S'].round(6)
+    display_df['权重 (W)'] = (display_df['weight_W'] * 100).round(2).astype(str) + '%'
+    display_df['加权推荐CPC'] = display_df['weighted_rec_cpc'].round(4)
+    display_df['加权最高CPC'] = display_df['weighted_max_cpc'].round(4)
+    
+    final_display = display_df[[
+        'keyword', 'aba_rank', 'recommended_cpc', 'max_cpc',
+        '价值分数 (S)', '权重 (W)', '加权推荐CPC', '加权最高CPC'
+    ]]
+    
+    final_display.columns = [
+        '关键词', 'ABA Rank', '推荐CPC', '最高CPC',
+        '价值分数 (S)', '权重 (W)', '加权推荐CPC', '加权最高CPC'
+    ]
+    
+    st.dataframe(final_display, use_container_width=True, hide_index=True)
+    
+    # 显示计算公式说明
+    with st.expander("📐 计算公式说明"):
+        st.markdown("""
+        ### 计算方法：
+        
+        1. **价值分数 (S)**  
+           `S = 1 / [ln(ABA_Rank)]²`
+        
+        2. **权重 (W)**  
+           `W = S / ∑S`
+        
+        3. **综合CPC**  
+           `综合CPC = ∑(W × CPC)`
+        
+        ---
+        
+        - 价值分数越高，表示该关键词在排名上的价值越大
+        - 权重表示每个关键词对综合CPC的贡献比例
+        - 最终综合CPC是所有关键词加权平均的结果
+        """)
+
 # 创建选项卡
 tab1, tab2 = st.tabs(["📝 手动输入", "📁 文件上传"])
 
