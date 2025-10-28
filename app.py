@@ -910,7 +910,7 @@ def main():
     st.markdown("---")
     st.markdown("""
     <div style="text-align: center; color: #666; padding: 2rem 0;">
-        <p style="margin: 0;">© 2024 Anker Oceanwing Inc. | 海翼IDC团队</p>
+        <p style="margin: 0;">© Anker Oceanwing Inc. | 海翼IDC团队</p>
         <p style="margin: 0.5rem 0 0 0; font-size: 13px;">市场洞察小程序 v1.2.0 - 让数据分析更简单</p>
     </div>
     """, unsafe_allow_html=True)
