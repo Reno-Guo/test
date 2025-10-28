@@ -701,7 +701,7 @@ def data_clean_app():
                             if file_name.endswith(('.xlsx', '.xls')):
                                 df = pd.read_excel(file_path, engine='openpyxl' if file_name.endswith('.xlsx') else 'xlrd')
                             elif file_name.endswith('.csv'):
-                                df = pd.read_csv(file_path)
+                                df = pd.read_csv(file_path, header=None)
                             
                             df = df.iloc[1:].reset_index(drop=True)
                             
