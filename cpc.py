@@ -259,41 +259,6 @@ with tab2:
             
             st.markdown("---")
             
-            # 读取文件2（竞价数据）
-            df2_raw = pd.read_excel(file2, header=None)
-            
-            st.markdown("### 📋 文件2预览（前10行）")
-            st.dataframe(df2_raw.head(10), use_container_width=True)
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                header_row_2 = st.number_input(
-                    "文件2表头所在行（从0开始）",
-                    min_value=0,
-                    max_value=len(df2_raw)-1,
-                    value=0,
-                    key="header2"
-                )
-            
-            # 重新读取文件2，指定表头行
-            df2 = pd.read_excel(file2, header=header_row_2)
-            
-            with col2:
-                rec_cpc_col = st.selectbox(
-                    "选择建议竞价-推荐列",
-                    options=df2.columns.tolist(),
-                    key="rec_cpc_col"
-                )
-            
-            with col3:
-                max_cpc_col = st.selectbox(
-                    "选择建议竞价-最高列",
-                    options=df2.columns.tolist(),
-                    key="max_cpc_col"
-                )
-            
-            st.markdown("---")
-            
             # 计算按钮
             if st.button("📊 处理文件并计算", type="primary", use_container_width=True, key="file_calc"):
                 # 提取所需数据
