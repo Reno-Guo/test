@@ -721,7 +721,7 @@ def main():
         
         /* 标题颜色 */
         h1, h2, h3, h4, h5, h6 {
-            color: #00a6e4 !important;
+            color: #ffffff !important;
             font-weight: 600 !important;
         }
         
