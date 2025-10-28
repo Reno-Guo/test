@@ -324,6 +324,14 @@ with tab2:
                     merged_df = merged_df.dropna()
                     merged_df = merged_df[merged_df['aba_rank'] > 0]
                     
+                    # 去重处理：如果关键词重复，保留第一条
+                    original_count = len(merged_df)
+                    merged_df = merged_df.drop_duplicates(subset='keyword', keep='first')
+                    duplicate_count = original_count - len(merged_df)
+                    
+                    if duplicate_count > 0:
+                        st.warning(f"⚠️ 检测到 {duplicate_count} 个重复关键词，已自动去重")
+                    
                     if len(merged_df) == 0:
                         st.error("❌ 没有有效的数据可以计算！请检查文件内容。")
                     else:
