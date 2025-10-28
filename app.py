@@ -30,7 +30,7 @@ def _read_excel_cached(file_or_path, sheet_name=0, engine=None):
 APP_CONFIG = {
     "app_title": "市场洞察小程序",
     "author": "海翼IDC团队",
-    "version": "v1.0.1",
+    "version": "v1.1.0",
     "contact": "idc@oceanwing.com",
     "company": "Anker Oceanwing Inc."
 }
@@ -450,9 +450,169 @@ def search_insight_viz_app():
             except Exception as e:
                 st.error(f"处理数据时发生错误：{e}")
 
+# 新功能：删除第一行并重新打包ZIP
+def data_clean_app():
+    with st.expander("DC-数据清理：删除第一行", expanded=False):
+        st.header("数据清理：删除文件第一行并重新打包")
+        
+        uploaded_file = st.file_uploader("选择一个 .zip 文件（包含 XLSX 或 CSV 文件）", type=["zip"], accept_multiple_files=False, key="clean_files")
+        output_filename = st.text_input("请输入输出 ZIP 文件名（例如：cleaned.zip）", value="cleaned_files.zip", key="clean_save")
+        
+        if st.button("清理并打包", key="clean_button"):
+            if not uploaded_file or not output_filename:
+                st.warning("请确保已选择 .zip 文件并输入输出文件名")
+                return
+            
+            try:
+                # 创建临时目录用于解压和处理文件
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    # 保存上传的ZIP文件
+                    temp_zip_path = os.path.join(temp_dir, uploaded_file.name)
+                    with open(temp_zip_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    
+                    # 解压ZIP
+                    with zipfile.ZipFile(temp_zip_path, 'r') as zip_ref:
+                        zip_ref.extractall(temp_dir)
+                    
+                    # 获取所有XLSX和CSV文件
+                    data_files = [f for f in os.listdir(temp_dir) if f.endswith(('.xlsx', '.xls', '.csv'))]
+                    
+                    if not data_files:
+                        st.warning("压缩文件中未找到任何 XLSX、XLS 或 CSV 文件")
+                        return
+                    
+                    # 处理每个文件：删除第一行
+                    processed_files = []
+                    for file_name in data_files:
+                        file_path = os.path.join(temp_dir, file_name)
+                        try:
+                            if file_name.endswith(('.xlsx', '.xls')):
+                                df = pd.read_excel(file_path, engine='openpyxl' if file_name.endswith('.xlsx') else 'xlrd')
+                            elif file_name.endswith('.csv'):
+                                df = pd.read_csv(file_path)
+                            
+                            # 删除第一行（假设第一行是索引0）
+                            df = df.iloc[1:].reset_index(drop=True)
+                            
+                            # 保存处理后的文件到临时目录，使用原文件名
+                            processed_path = os.path.join(temp_dir, f"cleaned_{file_name}")
+                            if file_name.endswith(('.xlsx', '.xls')):
+                                df.to_excel(processed_path, index=False, engine='openpyxl')
+                            elif file_name.endswith('.csv'):
+                                df.to_csv(processed_path, index=False)
+                            
+                            processed_files.append(processed_path)
+                        except Exception as e:
+                            st.error(f"处理文件 {file_name} 失败：{e}")
+                            continue
+                    
+                    if processed_files:
+                        # 创建新的ZIP缓冲区
+                        buffer = io.BytesIO()
+                        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as new_zip:
+                            for proc_path in processed_files:
+                                arcname = os.path.basename(proc_path).replace("cleaned_", "")  # 移除'cleaned_'前缀，保持原名
+                                new_zip.write(proc_path, arcname=arcname)
+                        
+                        buffer.seek(0)
+                        
+                        # 提供下载
+                        st.download_button(
+                            label="下载清理后的 ZIP 文件",
+                            data=buffer,
+                            file_name=output_filename,
+                            mime="application/zip",
+                            key="download_cleaned"
+                        )
+                        st.success("文件已清理并重新打包，可通过下载按钮获取")
+                    else:
+                        st.warning("没有可清理的文件")
+            except Exception as e:
+                st.error(f"处理 ZIP 文件时发生错误：{e}")
+
 # 主应用程序
 def main():
     st.set_page_config(page_title=APP_CONFIG["app_title"], layout="wide")
+    
+    # 自定义CSS优化UI，主色调 #00a6e4
+    st.markdown("""
+    <style>
+        /* 全局字体和背景 */
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f9f9f9;
+        }
+        
+        /* 标题颜色 */
+        h1, h2, h3, h4, h5, h6 {
+            color: #00a6e4 !important;
+        }
+        
+        /* 按钮样式 */
+        .stButton > button {
+            background-color: #00a6e4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 0.5rem 1rem;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        
+        .stButton > button:hover {
+            background-color: #0088c2;
+            color: white;
+        }
+        
+        /* 下载按钮样式 */
+        .stDownloadButton > button {
+            background-color: #00a6e4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 0.5rem 1rem;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        
+        .stDownloadButton > button:hover {
+            background-color: #0088c2;
+            color: white;
+        }
+        
+        /* Expander 样式 */
+        .streamlit-expanderHeader {
+            background-color: #e6f7ff;
+            border: 1px solid #00a6e4;
+            border-radius: 4px;
+            color: #00a6e4;
+            font-weight: bold;
+        }
+        
+        /* 输入框样式 */
+        .stTextInput > div > div > input {
+            border: 1px solid #00a6e4;
+            border-radius: 4px;
+        }
+        
+        .stTextArea > div > div > textarea {
+            border: 1px solid #00a6e4;
+            border-radius: 4px;
+        }
+        
+        /* 侧边栏（如果有） */
+        .css-1aumxhk {
+            background-color: #e6f7ff;
+        }
+        
+        /* 警告和成功消息 */
+        .stAlert {
+            border-radius: 4px;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
     st.title(APP_CONFIG["app_title"])
     
     # Display app configuration
@@ -469,6 +629,7 @@ def main():
     merge_data_app()
     search_insight_app()
     search_insight_viz_app()
+    data_clean_app()  # 添加新功能
 
 if __name__ == "__main__":
     main()
