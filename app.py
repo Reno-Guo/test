@@ -37,7 +37,7 @@ APP_CONFIG = {
 
 # 合并数据表格功能
 def merge_data_app():
-    with st.expander("MI-合并数据表格", expanded=False):
+    with st.expander("MI/SI-合并数据表格", expanded=False):
         st.header("合并数据表格")
         
         # 修改为接受单个 .zip 文件
