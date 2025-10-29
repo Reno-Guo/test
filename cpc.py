@@ -39,13 +39,13 @@ def calculate_and_display(keywords_list):
     with col1:
         st.metric(
             label="基于推荐CPC的综合CPC",
-            value=f"${comprehensive_rec_cpc:.4f}"
+            value=f"${comprehensive_rec_cpc:.2f}"
         )
     
     with col2:
         st.metric(
             label="基于最高CPC的综合CPC",
-            value=f"${comprehensive_max_cpc:.4f}"
+            value=f"${comprehensive_max_cpc:.2f}"
         )
     
     # 显示详细数据表格
