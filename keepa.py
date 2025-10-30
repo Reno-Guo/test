@@ -323,7 +323,7 @@ st.markdown('<div class="step-card">', unsafe_allow_html=True)
 st.markdown('<span class="step-number">2</span><h2 style="display: inline-block;">可视化</h2>', unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
-uploaded_xlsx = st.file_uploader("📁 选择包含销量的Excel文件(在第一步生成的文件中:H列填入对应月份的销量,表头为"销量";I列填入对应月份的销售额,表头为"销售额")", type=['xlsx'], key="visualization")
+uploaded_xlsx = st.file_uploader("📁 选择包含销量的Excel文件(在第一步生成的文件中:H列填入对应月份的销量,表头为'销量';I列填入对应月份的销售额,表头为'销售额')", type=['xlsx'], key="visualization")
 
 if uploaded_xlsx is not None:
     # Reset file pointer
