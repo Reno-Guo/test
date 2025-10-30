@@ -3,37 +3,247 @@ import pandas as pd
 import io
 import math
 
+# Page configuration
+st.set_page_config(
+    page_title="Keepa数据整理与可视化",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS with #00a6e4 as primary color
+st.markdown("""
+<style>
+    /* 主色调变量 */
+    :root {
+        --primary-color: #00a6e4;
+        --primary-dark: #0088ba;
+        --primary-light: #33b8eb;
+        --secondary-color: #f0f8ff;
+        --text-dark: #1e3a5f;
+        --border-radius: 12px;
+    }
+    
+    /* 隐藏默认元素 */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    
+    /* 整体背景 */
+    .stApp {
+        background: linear-gradient(135deg, #f5f7fa 0%, #e8f4f8 100%);
+    }
+    
+    /* 标题样式 */
+    h1 {
+        color: var(--primary-color) !important;
+        font-weight: 700 !important;
+        font-size: 2.5rem !important;
+        margin-bottom: 0.5rem !important;
+        text-shadow: 2px 2px 4px rgba(0, 166, 228, 0.1);
+    }
+    
+    h2 {
+        color: var(--text-dark) !important;
+        font-weight: 600 !important;
+        margin-top: 2rem !important;
+        padding-bottom: 0.5rem !important;
+        border-bottom: 3px solid var(--primary-color) !important;
+    }
+    
+    /* 信息卡片 */
+    .info-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: var(--border-radius);
+        box-shadow: 0 4px 6px rgba(0, 166, 228, 0.1);
+        margin-bottom: 1.5rem;
+        border-left: 4px solid var(--primary-color);
+    }
+    
+    /* 按钮样式 */
+    .stButton > button {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+        color: white;
+        border: none;
+        border-radius: var(--border-radius);
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0, 166, 228, 0.2);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 166, 228, 0.3);
+        background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
+    }
+    
+    .stButton > button:active {
+        transform: translateY(0);
+    }
+    
+    /* 文件上传器样式 */
+    .stFileUploader {
+        background: white;
+        padding: 2rem;
+        border-radius: var(--border-radius);
+        border: 2px dashed var(--primary-light);
+        transition: all 0.3s ease;
+    }
+    
+    .stFileUploader:hover {
+        border-color: var(--primary-color);
+        background: var(--secondary-color);
+    }
+    
+    /* 下载按钮 */
+    .stDownloadButton > button {
+        background: white;
+        color: var(--primary-color);
+        border: 2px solid var(--primary-color);
+        border-radius: var(--border-radius);
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .stDownloadButton > button:hover {
+        background: var(--primary-color);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 166, 228, 0.3);
+    }
+    
+    /* 信息提示框 */
+    .stInfo {
+        background: linear-gradient(135deg, #e3f5fc 0%, #b3e5fc 100%);
+        border-left: 4px solid var(--primary-color);
+        border-radius: var(--border-radius);
+        padding: 1rem;
+        color: var(--text-dark);
+    }
+    
+    /* 数据表格 */
+    .stDataFrame {
+        border-radius: var(--border-radius);
+        overflow: hidden;
+        box-shadow: 0 4px 6px rgba(0, 166, 228, 0.1);
+    }
+    
+    /* 分隔线 */
+    hr {
+        margin: 2rem 0;
+        border: none;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+    }
+    
+    /* 侧边栏 */
+    .css-1d391kg, [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #ffffff 0%, #e8f4f8 100%);
+    }
+    
+    /* 版本信息卡片 */
+    .version-card {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: var(--border-radius);
+        margin-bottom: 2rem;
+        box-shadow: 0 6px 12px rgba(0, 166, 228, 0.2);
+    }
+    
+    .version-card h3 {
+        color: white !important;
+        margin: 0 0 1rem 0;
+        font-size: 1.3rem;
+    }
+    
+    .version-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        font-size: 0.95rem;
+    }
+    
+    .version-info div {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .version-info strong {
+        min-width: 80px;
+    }
+    
+    /* 步骤卡片 */
+    .step-card {
+        background: white;
+        padding: 2rem;
+        border-radius: var(--border-radius);
+        box-shadow: 0 4px 6px rgba(0, 166, 228, 0.1);
+        margin-bottom: 2rem;
+        border-top: 4px solid var(--primary-color);
+    }
+    
+    .step-number {
+        display: inline-block;
+        width: 40px;
+        height: 40px;
+        background: var(--primary-color);
+        color: white;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 40px;
+        font-weight: bold;
+        font-size: 1.2rem;
+        margin-right: 1rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # App configuration
 APP_CONFIG = {
-    "app_title": "Keepa数据整理与可视化",
+    "app_title": "📊 Keepa数据整理与可视化",
     "author": "海翼IDC团队",
     "version": "v1.1.0",
     "contact": "idc@oceanwing.com",
     "company": "Anker Oceanwing Inc."
 }
 
-# Streamlit app title
+# Header
 st.title(APP_CONFIG["app_title"])
 
-# Display app configuration
+# Version info card
 st.markdown(f"""
-**版本**: {APP_CONFIG["version"]}  
-**作者**: {APP_CONFIG["author"]}  
-**公司**: {APP_CONFIG["company"]}  
-**联系方式**: {APP_CONFIG["contact"]}  
-""")
+<div class="version-card">
+    <h3>🚀 应用信息</h3>
+    <div class="version-info">
+        <div><strong>版本:</strong> {APP_CONFIG["version"]}</div>
+        <div><strong>作者:</strong> {APP_CONFIG["author"]}</div>
+        <div><strong>公司:</strong> {APP_CONFIG["company"]}</div>
+        <div><strong>联系方式:</strong> {APP_CONFIG["contact"]}</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("---")
 
 # Section 1: Data Processing
-st.header("数据处理")
-uploaded_file = st.file_uploader("选择Keepa导出的Excel文件", type=['xlsx'], key="data_processing")
+st.markdown('<div class="step-card">', unsafe_allow_html=True)
+st.markdown('<span class="step-number">1</span><h2 style="display: inline-block;">数据处理</h2>', unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
+
+uploaded_file = st.file_uploader("📁 选择Keepa导出的Excel文件", type=['xlsx'], key="data_processing")
 
 if uploaded_file is not None:
     # Read Excel file
     try:
         df = pd.read_excel(uploaded_file, sheet_name=0, engine='openpyxl')
     except Exception as e:
-        st.error(f"无法读取Excel文件: {str(e)}")
-        st.write("请确保上传的文件是有效的Excel文件（.xlsx）。")
+        st.error(f"❌ 无法读取Excel文件: {str(e)}")
+        st.write("请确保上传的文件是有效的Excel文件(.xlsx)。")
         uploaded_file = None
 
 if uploaded_file is not None:
@@ -80,8 +290,10 @@ if uploaded_file is not None:
     # Display the processed data with formatted percentage for display only
     display_df = result_df.copy()
     display_df['评分数增长%'] = display_df['评分数增长%'].apply(lambda x: f"{x:.1f}%")
-    st.write("### 处理后的数据预览")
-    st.dataframe(display_df)
+    
+    st.success("✅ 数据处理完成!")
+    st.write("### 📊 处理后的数据预览")
+    st.dataframe(display_df, use_container_width=True)
     
     # Convert DataFrame to Excel
     excel_buffer = io.BytesIO()
@@ -89,21 +301,29 @@ if uploaded_file is not None:
     excel_data = excel_buffer.getvalue()
     
     # Download button for Excel
-    st.download_button(
-        label="下载处理后的Excel文件",
-        data=excel_data,
-        file_name="monthly_last_day_ratings.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.download_button(
+            label="⬇️ 下载处理后的Excel文件",
+            data=excel_data,
+            file_name="monthly_last_day_ratings.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
     
     # Reminder about adding sales column
-    st.info("请在下载的Excel文件的H列添加'销量'列、I列添加'销售额'列，以包含按月销售数据。")
+    st.info("💡 请在下载的Excel文件的H列添加'销量'列、I列添加'销售额'列,以包含按月销售数据。")
 else:
-    st.write("请上传Excel文件以继续处理。")
+    st.info("👆 请上传Excel文件以继续处理。")
+
+st.markdown("---")
 
 # Section 2: Visualization
-st.header("可视化")
-uploaded_xlsx = st.file_uploader("选择包含销量的Excel文件(在第一步生成的文件中：H列填入对应月份的销量，表头为“销量”；I列填入对应月份的销售额，表头为“销售额”)", type=['xlsx'], key="visualization")
+st.markdown('<div class="step-card">', unsafe_allow_html=True)
+st.markdown('<span class="step-number">2</span><h2 style="display: inline-block;">可视化</h2>', unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
+
+uploaded_xlsx = st.file_uploader("📁 选择包含销量的Excel文件(在第一步生成的文件中:H列填入对应月份的销量,表头为"销量";I列填入对应月份的销售额,表头为"销售额")", type=['xlsx'], key="visualization")
 
 if uploaded_xlsx is not None:
     # Reset file pointer
@@ -113,8 +333,8 @@ if uploaded_xlsx is not None:
     try:
         viz_df = pd.read_excel(uploaded_xlsx, engine='openpyxl')
     except Exception as e:
-        st.error(f"无法读取Excel文件: {str(e)}")
-        st.write("请确保上传的文件是有效的Excel文件（.xlsx格式）且包含正确的列。")
+        st.error(f"❌ 无法读取Excel文件: {str(e)}")
+        st.write("请确保上传的文件是有效的Excel文件(.xlsx格式)且包含正确的列。")
         uploaded_xlsx = None
 
 if uploaded_xlsx is not None:
@@ -123,7 +343,7 @@ if uploaded_xlsx is not None:
     missing_columns = [col for col in required_columns if col not in viz_df.columns]
     
     if missing_columns:
-        st.error(f"上传的Excel文件缺少以下必要列：{', '.join(missing_columns)}")
+        st.error(f"❌ 上传的Excel文件缺少以下必要列:{', '.join(missing_columns)}")
     else:
         # Ensure data types
         viz_df['日期'] = pd.to_datetime(viz_df['日期'], errors='coerce')
@@ -158,7 +378,9 @@ if uploaded_xlsx is not None:
         sales_y_max = math.ceil(max_sales / 1000) * 1000
         max_review_rate = max(review_rates) * 1.1 if review_rates else 100
         
-        # HTML template for charts
+        st.success("✅ 数据加载成功!")
+        
+        # HTML template for charts (keeping original visualization code)
         html_template = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -174,14 +396,20 @@ if uploaded_xlsx is not None:
             align-items: center;
             padding: 20px;
             font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8f4f8 100%);
         }}
         canvas {{
             margin: 20px 0;
             max-width: 900px;
             width: 100%;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 166, 228, 0.1);
         }}
         h2 {{
             margin: 10px 0;
+            color: #00a6e4;
         }}
     </style>
 </head>
@@ -194,7 +422,7 @@ if uploaded_xlsx is not None:
     <canvas id="reviewRateChart" width="900" height="400"></canvas>
 
     <script>
-        // 折线图（评分数、评分和销量）
+        // 折线图(评分数、评分和销量)
         const lineCtx = document.getElementById('lineChart').getContext('2d');
         new Chart(lineCtx, {{
             type: 'line',
@@ -314,7 +542,7 @@ if uploaded_xlsx is not None:
             plugins: [ChartDataLabels]
         }});
 
-        // 混合图（柱状图+销量折线）
+        // 混合图(柱状图+销量折线)
         const barCtx = document.getElementById('barChart').getContext('2d');
         new Chart(barCtx, {{
             type: 'bar',
@@ -413,7 +641,7 @@ if uploaded_xlsx is not None:
             plugins: [ChartDataLabels]
         }});
 
-        // 折线图（留评率）
+        // 折线图(留评率)
         const reviewRateCtx = document.getElementById('reviewRateChart').getContext('2d');
         new Chart(reviewRateCtx, {{
             type: 'line',
@@ -490,17 +718,10 @@ if uploaded_xlsx is not None:
 </body>
 </html>
 """
-        # Download button for HTML
-        st.download_button(
-            label="下载可视化HTML文件",
-            data=html_template,
-            file_name="product_trend_charts.html",
-            mime="text/html"
-        )
-
+        
         sales_amount = viz_df['销售额'].astype(float).fillna(0).tolist() if '销售额' in viz_df.columns else [0] * len(viz_df)
 
-        # 绿色水平虚线阈值（基于销售额最大值，严格大于）
+        # 绿色水平虚线阈值(基于销售额最大值,严格大于)
         max_amt = max(sales_amount) if sales_amount else 0
         _thresholds = [100000, 300000, 500000, 750000, 1000000]
         _selected = [t for t in _thresholds if max_amt > t]
@@ -513,19 +734,19 @@ if uploaded_xlsx is not None:
                 return str(n)
         _annotations_js = ",\n".join([
             f"""
-            \"line{i+1}\": {{
-              \"type\": \"line\",
-              \"yMin\": {t}, \"yMax\": {t},
-              \"yScaleID\": \"y2\",
-              \"borderColor\": \"rgba(0,128,0,0.9)\",
-              \"borderWidth\": 2,
-              \"borderDash\": [6,6],
-              \"label\": {{
-                \"display\": true,
-                \"content\": \"{_fmt(t)}\",
-                \"position\": \"end\",
-                \"backgroundColor\": \"rgba(0,0,0,0.06)\",
-                \"color\": \"#0a0\"
+            "line{i+1}": {{
+              "type": "line",
+              "yMin": {t}, "yMax": {t},
+              "yScaleID": "y2",
+              "borderColor": "rgba(0,128,0,0.9)",
+              "borderWidth": 2,
+              "borderDash": [6,6],
+              "label": {{
+                "display": true,
+                "content": "{_fmt(t)}",
+                "position": "end",
+                "backgroundColor": "rgba(0,0,0,0.06)",
+                "color": "#0a0"
               }}
             }}
             """.strip()
@@ -540,9 +761,9 @@ if uploaded_xlsx is not None:
 <title>Sales Chart</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; }}
-  h1 {{ margin: 0 0 16px; }}
-  .chart-wrap {{ max-width: 1200px; height: 520px; }}
+  body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 24px; background: linear-gradient(135deg, #f5f7fa 0%, #e8f4f8 100%); }}
+  h1 {{ margin: 0 0 16px; color: #00a6e4; }}
+  .chart-wrap {{ max-width: 1200px; height: 520px; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0, 166, 228, 0.1); }}
 </style>
 </head>
 <body>
@@ -648,14 +869,28 @@ if uploaded_xlsx is not None:
 </html>
 """
 
-
-
-        st.download_button(
-            label="下载销量-销售额单图（sales_chart_fixed_green.html）",
-            data=sales_chart_html,
-            file_name="sales_chart_fixed_green.html",
-            mime="text/html"
-        )
+        # Download buttons
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.download_button(
+                label="⬇️ 下载可视化HTML文件",
+                data=html_template,
+                file_name="product_trend_charts.html",
+                mime="text/html",
+                use_container_width=True
+            )
+        
+        with col2:
+            st.download_button(
+                label="⬇️ 下载销量-销售额单图",
+                data=sales_chart_html,
+                file_name="sales_chart_fixed_green.html",
+                mime="text/html",
+                use_container_width=True
+            )
+        
+        st.success("🎉 可视化文件已准备好下载!")
 
 else:
-    st.write("请上传包含销量的Excel文件以生成可视化图表。")
+    st.info("👆 请上传包含销量的Excel文件以生成可视化图表。")
