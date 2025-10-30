@@ -207,7 +207,7 @@ st.markdown("""
 APP_CONFIG = {
     "app_title": "📊 Keepa数据整理与可视化",
     "author": "海翼IDC团队",
-    "version": "v1.1.0",
+    "version": "v1.1.1",
     "contact": "idc@oceanwing.com",
     "company": "Anker Oceanwing Inc."
 }
