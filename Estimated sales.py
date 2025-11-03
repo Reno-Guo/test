@@ -46,7 +46,7 @@ if file1 and file2:
         if pd.isna(rank) or pd.isna(bid_recommend) or pd.isna(concentration):
             return np.nan
 
-        if rank <= 5000 or bid_recommend > 5:
+        if 0 < rank <= 5000 or bid_recommend > 5:
             return 0.02  # 2%
         elif 5000 < rank <= 10000:
             return 0.035  # 3.5%
