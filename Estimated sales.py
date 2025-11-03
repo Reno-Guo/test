@@ -1,4 +1,4 @@
-import streamlit as st
+ import streamlit as st
 import pandas as pd
 import numpy as np
 from io import BytesIO
@@ -341,7 +341,7 @@ if file1 and file2:
         
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            st.info("💡 提示：双击单元格即可编辑"预估修正CVR"列的值")
+            st.info("💡 提示：双击单元格即可编辑\"预估修正CVR\"列的值")
 
         edited_df = st.data_editor(
             result_df, 
