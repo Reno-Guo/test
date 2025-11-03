@@ -97,10 +97,24 @@ if file1 and file2:
         for r in dataframe_to_rows(df.drop(columns=['预估单量']), index=False, header=True):
             ws.append(r)
 
-        # 设置表头样式：绿色
+        # 设置表头样式
+        # 绿色填充：A到H列（原列）
         green_fill = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
-        for cell in ws[1]:
+        for col in range(1, 9):  # A=1 to H=8
+            cell = ws.cell(row=1, column=col)
             cell.fill = green_fill
+
+        # 黄色填充：I、J、K列（日搜索量、搜索量份额占比、预估修正CVR）
+        yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+        for col in [9, 10, 11]:  # I=9, J=10, K=11
+            cell = ws.cell(row=1, column=col)
+            cell.fill = yellow_fill
+
+        # 蓝色填充：L列（预估单量）
+        blue_fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
+        l_header = ws.cell(row=1, column=12)
+        l_header.value = "预估单量"  # 设置表头
+        l_header.fill = blue_fill
 
         # 设置预估单量列公式（L列，从行2开始）
         for row in range(2, len(df) + 2):
@@ -140,7 +154,20 @@ if file1 and file2:
     st.subheader("预览（预估单量将在Excel中自动计算）")
     preview_df = edited_df.copy()
     preview_df['预估单量'] = preview_df['日搜索量'] * preview_df['搜索量份额占比'] * (preview_df['点击转化率'] + preview_df['预估修正CVR'].fillna(0))
-    st.dataframe(preview_df)
+    
+    # 为预览添加样式（可选，Streamlit中模拟颜色）
+    def highlight_headers(df):
+        def color_header(val):
+            if isinstance(val, str) and val in ['日搜索量', '搜索量份额占比', '预估修正CVR']:
+                return 'background-color: yellow'
+            elif val == '预估单量':
+                return 'background-color: lightblue'
+            elif isinstance(val, str) and val in ['关键词', '翻译', '搜索量', '点击转化率', '建议竞价-推荐', '建议竞价-最高', 'ABATop3集中度-点击', '搜索量排名']:
+                return 'background-color: lightgreen'
+            return ''
+        return pd.DataFrame(df).style.applymap(color_header, subset=pd.IndexSlice[[0], :]).to_html()
+
+    st.markdown(highlight_headers(preview_df), unsafe_allow_html=True)
 
 else:
     st.info("请上传两个xlsx文件以继续。")
