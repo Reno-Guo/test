@@ -303,25 +303,9 @@ if file1 and file2:
         result_df = result_df[final_columns]
 
         st.markdown("<hr>", unsafe_allow_html=True)
-
-        # 数据编辑区
-        st.markdown("<h3>📝 数据编辑区</h3>", unsafe_allow_html=True)
-
-        edited_df = st.data_editor(
-            result_df, 
-            num_rows="dynamic", 
-            use_container_width=True,
-            column_config={
-                "预估修正CVR": st.column_config.NumberColumn(
-                    "预估修正CVR",
-                    help="请输入预估修正CVR值",
-                    format="%.4f"
-                )
-            },
-            height=400
-        )
-
-        st.markdown("<hr>", unsafe_allow_html=True)
+        
+        # 直接使用result_df，不需要编辑
+        edited_df = result_df
 
         # 步骤3：下载结果
         st.markdown("""
