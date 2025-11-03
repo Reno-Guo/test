@@ -214,7 +214,7 @@ st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown("""
 <div class="step-indicator">
     <div class="step-number">1</div>
-    <div class="step-text">上传第一个文件（至少带有 关键词 + 搜索量排名 两列）</div>
+    <div class="step-text">上传第一个文件（表头在第二行，至少带有 关键词 + 搜索量排名 两列）</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -228,7 +228,7 @@ file1 = st.file_uploader(
 st.markdown("""
 <div class="step-indicator">
     <div class="step-number">2</div>
-    <div class="step-text">上传第二个文件（SIF关键词转化率数据）</div>
+    <div class="step-text">上传第二个文件（表头在第二行，SIF关键词转化率数据）</div>
 </div>
 """, unsafe_allow_html=True)
 
