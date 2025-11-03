@@ -304,19 +304,8 @@ if file1 and file2:
 
         st.markdown("<hr>", unsafe_allow_html=True)
 
-        # 步骤3：编辑数据
-        st.markdown("""
-        <div class="step-indicator">
-            <div class="step-number">3</div>
-            <div class="step-text">编辑预估修正CVR（可选）</div>
-        </div>
-        """, unsafe_allow_html=True)
-
+        # 数据编辑区
         st.markdown("<h3>📝 数据编辑区</h3>", unsafe_allow_html=True)
-        
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.info("💡 提示：双击单元格即可编辑\"预估修正CVR\"列的值")
 
         edited_df = st.data_editor(
             result_df, 
@@ -334,10 +323,10 @@ if file1 and file2:
 
         st.markdown("<hr>", unsafe_allow_html=True)
 
-        # 步骤4：下载结果
+        # 步骤3：下载结果
         st.markdown("""
         <div class="step-indicator">
-            <div class="step-number">4</div>
+            <div class="step-number">3</div>
             <div class="step-text">下载处理结果</div>
         </div>
         """, unsafe_allow_html=True)
@@ -459,6 +448,6 @@ else:
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown("""
 <div style="text-align: center; color: #999; padding: 2rem 0;">
-    <p>© 销量预估分析工具 </p>
+    <p>© 2024 销量预估分析工具 | Powered by Streamlit</p>
 </div>
 """, unsafe_allow_html=True)
