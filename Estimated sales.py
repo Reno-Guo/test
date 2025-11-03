@@ -1,6 +1,10 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from io import BytesIO
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill
+from openpyxl.utils.dataframe import dataframe_to_rows
 
 # 标题
 st.title("表格处理工具")
@@ -39,6 +43,9 @@ if file1 and file2:
         bid_recommend = row['建议竞价-推荐']
         concentration = row['ABATop3集中度-点击']
 
+        if pd.isna(rank) or pd.isna(bid_recommend) or pd.isna(concentration):
+            return np.nan
+
         if rank <= 5000 or bid_recommend > 5:
             return 0.02  # 2%
         elif 5000 < rank <= 10000:
@@ -55,26 +62,85 @@ if file1 and file2:
 
     result_df['搜索量份额占比'] = result_df.apply(calculate_share, axis=1)
 
-    # 预估修正CVR 留白（初始设为0，用户可编辑）
-    result_df['预估修正CVR'] = 0.0
+    # 预估修正CVR 留白（NaN）
+    result_df['预估修正CVR'] = np.nan
 
-    # 预估单量
-    result_df['预估单量'] = result_df['日搜索量'] * result_df['搜索量份额占比'] * (result_df['点击转化率'] + result_df['预估修正CVR'])
+    # 预估单量 初始不填值
+    result_df['预估单量'] = np.nan
 
-    # 显示结果表，并允许编辑预估修正CVR
-    st.subheader("结果表")
-    edited_df = st.data_editor(result_df, num_rows="dynamic", use_container_width=True)
+    # 更新列顺序
+    final_columns = ['关键词', '翻译', '搜索量', '点击转化率', '建议竞价-推荐', '建议竞价-最高', 'ABATop3集中度-点击', '搜索量排名', '日搜索量', '搜索量份额占比', '预估修正CVR', '预估单量']
+    result_df = result_df[final_columns]
 
-    # 如果编辑了预估修正CVR，重新计算预估单量
-    if not edited_df.equals(result_df):
-        edited_df['预估单量'] = edited_df['日搜索量'] * edited_df['搜索量份额占比'] * (edited_df['点击转化率'] + edited_df['预估修正CVR'])
-        st.data_editor(edited_df, num_rows="dynamic", use_container_width=True)  # 重新显示更新后的表
+    # 显示结果表，并允许编辑（主要是预估修正CVR）
+    st.subheader("结果表（请编辑预估修正CVR列）")
+    edited_df = st.data_editor(
+        result_df, 
+        num_rows="dynamic", 
+        use_container_width=True,
+        column_config={
+            "预估修正CVR": st.column_config.NumberColumn(
+                "预估修正CVR",
+                help="请输入预估修正CVR值",
+                format="%.4f"
+            )
+        }
+    )
 
-    # 自定义样式使表头绿色
-    def style_header(df):
-        styler = df.style.set_table_styles([{'selector': 'th', 'props': [('background-color', 'lightgreen')]}])
-        return styler
+    # 下载按钮
+    def generate_excel(df):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "结果表"
 
-    st.dataframe(style_header(result_df))
+        # 写入数据（不包括预估单量数值）
+        for r in dataframe_to_rows(df.drop(columns=['预估单量']), index=False, header=True):
+            ws.append(r)
+
+        # 设置表头样式：绿色
+        green_fill = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
+        for cell in ws[1]:
+            cell.fill = green_fill
+
+        # 设置预估单量列公式（L列，从行2开始）
+        for row in range(2, len(df) + 2):
+            # 列位置：I=日搜索量 (9), J=搜索量份额占比 (10), D=点击转化率 (4), K=预估修正CVR (11)
+            formula = f'=I{row}*J{row}*(D{row}+K{row})'
+            ws.cell(row=row, column=12).value = formula  # L列是12
+
+        # 调整列宽
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+
+        # 保存到BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return output
+
+    if st.button("下载结果xlsx文件"):
+        excel_file = generate_excel(edited_df)
+        st.download_button(
+            label="点击下载结果.xlsx",
+            data=excel_file,
+            file_name="结果.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+    # 显示样式化的预览（不包括公式列数值）
+    st.subheader("预览（预估单量将在Excel中自动计算）")
+    preview_df = edited_df.copy()
+    preview_df['预估单量'] = preview_df['日搜索量'] * preview_df['搜索量份额占比'] * (preview_df['点击转化率'] + preview_df['预估修正CVR'].fillna(0))
+    st.dataframe(preview_df)
+
 else:
     st.info("请上传两个xlsx文件以继续。")
