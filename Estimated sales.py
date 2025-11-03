@@ -128,15 +128,6 @@ st.markdown("""
         box-shadow: var(--shadow);
     }
     
-    /* 数据编辑器样式 */
-    [data-testid="stDataFrame"] {
-        background: white !important;
-        border-radius: 12px !important;
-        padding: 1rem !important;
-        box-shadow: var(--shadow);
-        border: 1px solid #e0f4fc !important;
-    }
-    
     /* 表格表头 */
     [data-testid="stDataFrame"] thead tr th {
         background: linear-gradient(135deg, #00a6e4 0%, #0087b8 100%) !important;
@@ -215,7 +206,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 页面标题
-st.markdown("<h1>📊 销量预估分析工具</h1>", unsafe_allow_html=True)
+st.markdown("<h1>📊 关键词预估销量工具</h1>", unsafe_allow_html=True)
 
 st.markdown("<hr>", unsafe_allow_html=True)
 
@@ -223,7 +214,7 @@ st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown("""
 <div class="step-indicator">
     <div class="step-number">1</div>
-    <div class="step-text">上传第一个文件（带有 关键词 + 搜索量排名 两列）</div>
+    <div class="step-text">上传第一个文件（至少带有 关键词 + 搜索量排名 两列）</div>
 </div>
 """, unsafe_allow_html=True)
 
