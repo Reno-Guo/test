@@ -217,31 +217,6 @@ st.markdown("""
 # 页面标题
 st.markdown("<h1>📊 销量预估分析工具</h1>", unsafe_allow_html=True)
 
-# 使用说明
-with st.expander("📖 使用说明", expanded=False):
-    st.markdown("""
-    <div class="card">
-        <h3 style="color: #00a6e4; margin-top: 0;">工具功能</h3>
-        <p>本工具可以帮助您合并和分析两个Excel文件的数据，自动计算搜索量份额占比和预估单量。</p>
-        
-        <h4 style="color: #0087b8;">操作步骤：</h4>
-        <ol style="line-height: 1.8;">
-            <li>上传第一个xlsx文件（包含关键词和搜索量排名）</li>
-            <li>上传第二个xlsx文件（包含关键词、翻译、搜索量等详细数据）</li>
-            <li>系统自动合并数据并计算相关指标</li>
-            <li>在结果表中编辑"预估修正CVR"列（如需要）</li>
-            <li>下载包含公式的Excel文件</li>
-        </ol>
-        
-        <h4 style="color: #0087b8;">注意事项：</h4>
-        <ul style="line-height: 1.8;">
-            <li>两个文件的表头必须在第二行</li>
-            <li>确保文件包含所需的列名</li>
-            <li>预估单量在Excel文件中以公式形式存在，可自动计算</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
-
 st.markdown("<hr>", unsafe_allow_html=True)
 
 # 步骤1：上传文件
