@@ -8,7 +8,7 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 
 # 页面配置
 st.set_page_config(
-    page_title="销量预估工具",
+    page_title="关键词预估销量工具",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -223,7 +223,7 @@ st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown("""
 <div class="step-indicator">
     <div class="step-number">1</div>
-    <div class="step-text">上传第一个文件（关键词 + 搜索量排名）</div>
+    <div class="step-text">上传第一个文件（带有 关键词 + 搜索量排名 两列）</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -231,13 +231,13 @@ file1 = st.file_uploader(
     "选择第一个xlsx文件",
     type=["xlsx"],
     key="file1",
-    help="文件应包含：关键词、搜索量排名"
+    help="表头在第二行，文件应包含：关键词、搜索量排名"
 )
 
 st.markdown("""
 <div class="step-indicator">
     <div class="step-number">2</div>
-    <div class="step-text">上传第二个文件（详细数据）</div>
+    <div class="step-text">上传第二个文件（SIF关键词转化率数据）</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -245,7 +245,7 @@ file2 = st.file_uploader(
     "选择第二个xlsx文件",
     type=["xlsx"],
     key="file2",
-    help="文件应包含：关键词、翻译、搜索量、点击转化率、建议竞价-推荐、建议竞价-最高、ABATop3集中度-点击"
+    help="表头在第二行，文件应包含：关键词、翻译、搜索量、点击转化率、建议竞价-推荐、建议竞价-最高、ABATop3集中度-点击"
 )
 
 if file1 and file2:
@@ -379,42 +379,6 @@ if file1 and file2:
         preview_df['预估单量'] = preview_df['日搜索量'] * preview_df['搜索量份额占比'] * (preview_df['点击转化率'] + preview_df['预估修正CVR'].fillna(0))
         
         st.dataframe(preview_df, use_container_width=True, height=400)
-        
-        # 数据统计
-        st.markdown("<h3>📈 数据统计</h3>", unsafe_allow_html=True)
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.markdown("""
-            <div class="card" style="text-align: center;">
-                <h4 style="color: #00a6e4; margin: 0;">总关键词数</h4>
-                <h2 style="color: #0087b8; margin: 0.5rem 0;">{}</h2>
-            </div>
-            """.format(len(preview_df)), unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown("""
-            <div class="card" style="text-align: center;">
-                <h4 style="color: #00a6e4; margin: 0;">平均日搜索量</h4>
-                <h2 style="color: #0087b8; margin: 0.5rem 0;">{:.0f}</h2>
-            </div>
-            """.format(preview_df['日搜索量'].mean()), unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown("""
-            <div class="card" style="text-align: center;">
-                <h4 style="color: #00a6e4; margin: 0;">平均点击转化率</h4>
-                <h2 style="color: #0087b8; margin: 0.5rem 0;">{:.2%}</h2>
-            </div>
-            """.format(preview_df['点击转化率'].mean()), unsafe_allow_html=True)
-        
-        with col4:
-            st.markdown("""
-            <div class="card" style="text-align: center;">
-                <h4 style="color: #00a6e4; margin: 0;">预估总单量</h4>
-                <h2 style="color: #0087b8; margin: 0.5rem 0;">{:.0f}</h2>
-            </div>
-            """.format(preview_df['预估单量'].sum()), unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"❌ 处理文件时出错：{str(e)}")
@@ -432,6 +396,6 @@ else:
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown("""
 <div style="text-align: center; color: #999; padding: 2rem 0;">
-    <p>© 2024 销量预估分析工具 | Powered by Streamlit</p>
+    <p>© 关键词预估销量分析工具 </p>
 </div>
 """, unsafe_allow_html=True)
