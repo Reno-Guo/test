@@ -5,4 +5,5 @@ xlrd>=2.0.1
 matplotlib>=3.9.1
 adjustText>=1.2.0
 plotly>=5.22.0
-
+sqlalchemy>=2.0.0
+clickhouse-sqlalchemy>=0.2.3
