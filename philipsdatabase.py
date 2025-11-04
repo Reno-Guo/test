@@ -61,20 +61,27 @@ def apply_custom_styles():
         /* 主标题 */
         .main-title {{
             color: {BRAND_COLOR};
-            font-size: 2.8rem;
+            font-size: 2.2rem;
             font-weight: 700;
             text-align: center;
-            padding: 1.5rem 0;
-            margin-bottom: 0.5rem;
+            padding: 1rem 0 0.3rem 0;
+            margin: 0;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
         }}
         
         .main-subtitle {{
             text-align: center;
             color: #666;
-            font-size: 1.1rem;
-            margin-bottom: 2.5rem;
+            font-size: 0.95rem;
+            margin: 0 0 1.5rem 0;
             font-weight: 400;
+        }}
+        
+        /* 主容器 - 紧凑布局 */
+        .main-container {{
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 1rem;
         }}
         
         /* 分组标题 - 更轻量 */
