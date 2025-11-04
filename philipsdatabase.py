@@ -164,7 +164,7 @@ def send_email(to_email, subject, body):
 def send_email_code(to_email, code):
     beijing_time = datetime.now(beijing_tz)
     # 邮件内容
-    subject = '飞利浦数据库操作程序验证码'
+    subject = '数据库操作程序验证码'
     body = f'您的验证码是: {code}\n有效期: 5 分钟\n\n发送时间: {beijing_time.strftime("%Y-%m-%d %H:%M:%S")} (北京时间)'
     return send_email(to_email, subject, body)
 
@@ -356,7 +356,7 @@ def main():
             else:
                 st.error(result)
 
-        st.info('“导出空表模板”生成 XLSX 文件（只有表头），填写后上传。上传前会自动生成备份并提供下载按钮（内存中生成，便于 Web 端下载）。支持 CSV/XLSX。')
+        st.info('“导出空表模板”生成 XLSX 文件（只有表头）。上传前会自动生成备份并提供下载按钮。支持 CSV/XLSX。')
 
 if __name__ == '__main__':
     main()
