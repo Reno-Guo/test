@@ -149,17 +149,22 @@ def send_email(to_email, subject, body):
     msg['From'] = sender_email
     msg['To'] = to_email
 
+    # 新增：添加 CC 头（如果有）
+    if cc_emails:
+        msg['Cc'] = ', '.join(cc_emails)
+
     try:
         # 关键修改：使用 SMTP_SSL for 端口 465 (SSL)
         import smtplib  # 确保导入
+        recipients = [to_email] + (cc_emails or [])  # 扩展收件人列表
         with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
             server.login(sender_email, sender_password)
-            server.sendmail(sender_email, to_email, msg.as_string())
+            server.sendmail(sender_email, recipients, msg.as_string())
         return True
     except Exception as e:
         st.error(f'发送邮件失败: {str(e)}')
         return False
-
+    
 # 发送邮件验证码函数（使用北京时间）
 def send_email_code(to_email, code):
     beijing_time = datetime.now(beijing_tz)
@@ -254,7 +259,7 @@ def upload_data(table_name, upload_mode, uploaded_file):
 如有疑问，请联系管理员。"""
 
         to_email = 'reno.guo@oceanwing.com'  # 固定日志接收邮箱
-        if send_email(to_email, log_subject, log_body):
+        if send_email(to_email, log_subject, log_body,cc_emails=['yana.cao@oceanwing.com']):
             st.info('操作日志已发送到指定邮箱。')
         else:
             st.warning('上传成功，但日志邮件发送失败。')
