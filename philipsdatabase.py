@@ -137,7 +137,7 @@ def clean_data(df):
     return df
 
 # 通用发送邮件函数
-def send_email(to_email, subject, body, cc_emails=None):  # 修复：添加 cc_emails=None 参数
+def send_email(to_email, subject, body, cc_emails=None):
     # 配置你的 SMTP 服务器细节（替换为你的实际配置）
     smtp_server = 'smtp.feishu.cn'
     smtp_port = 465
@@ -150,7 +150,7 @@ def send_email(to_email, subject, body, cc_emails=None):  # 修复：添加 cc_e
     msg['To'] = to_email
 
     # 添加 CC 头（如果有）
-    if cc_emails:  # None 或空列表时跳过
+    if cc_emails:
         msg['Cc'] = ', '.join(cc_emails)
 
     try:
@@ -164,7 +164,7 @@ def send_email(to_email, subject, body, cc_emails=None):  # 修复：添加 cc_e
     except Exception as e:
         st.error(f'发送邮件失败: {str(e)}')
         return False
-    
+
 # 发送邮件验证码函数（使用北京时间）
 def send_email_code(to_email, code):
     beijing_time = datetime.now(beijing_tz)
@@ -177,30 +177,9 @@ def send_email_code(to_email, code):
 def generate_code():
     return ''.join(random.choices('0123456789', k=6))  # 6位数字验证码
 
-# 上传函数（使用 TRUNCATE + APPEND 实现替换）
-def upload_data(table_name, upload_mode, uploaded_file):
-    if uploaded_file is None:
-        return '请选择文件'
-
-    # 读取文件
+# 执行上传逻辑（仅在确认下载后调用）
+def perform_upload(table_name, upload_mode, df, backup_filename):
     try:
-        if uploaded_file.name.lower().endswith('.csv'):
-            df = pd.read_csv(uploaded_file)
-        elif uploaded_file.name.lower().endswith('.xlsx'):
-            df = pd.read_excel(uploaded_file)
-        else:
-            return '不支持的文件格式。请使用 CSV 或 XLSX。'
-
-        df = clean_data(df)
-
-        if df.empty:
-            return '文件为空或无有效数据'
-
-        expected_cols = ['Country', 'SKU', 'spend_contrbution', 'Profitable_ROAS', 'Breakeven_ROAS']
-        missing_cols = [col for col in expected_cols if col not in df.columns]
-        if missing_cols:
-            return f'文件缺少必要列: {", ".join(missing_cols)}。请确保文件列名为: {", ".join(expected_cols)}'
-
         engine = get_engine()
 
         if not table_exists(engine, table_name, 'semanticdb_haiyi'):
@@ -211,22 +190,6 @@ def upload_data(table_name, upload_mode, uploaded_file):
             if upload_mode == 'replace':
                 grant_sql += "\nGRANT TRUNCATE ON semanticdb_haiyi.{table_name} TO haiyi;"
             return f'权限不足。请联系管理员执行:\n{grant_sql}'
-
-        # 强制备份（返回 buffer 和 filename）
-        success, backup_info = backup_table_before_upload(table_name)
-        if not success:
-            return backup_info
-
-        backup_buffer, backup_filename = backup_info
-
-        # 显示下载按钮（备份生成后立即提供下载）
-        st.download_button(
-            label=f'立即下载备份文件: {backup_filename}',
-            data=backup_buffer,
-            file_name=backup_filename,
-            mime='text/csv'
-        )
-        st.info('⚠️ 请立即点击上方按钮下载备份文件！上传操作将继续进行。')
 
         # 处理上传模式
         with engine.connect() as conn:
@@ -252,21 +215,103 @@ def upload_data(table_name, upload_mode, uploaded_file):
 操作时间: {beijing_time.strftime("%Y-%m-%d %H:%M:%S")} (北京时间)
 操作类型: {operation_type}
 操作表名: {table_name}
-上传文件: {uploaded_file.name}
+上传文件: {uploaded_file.name if 'uploaded_file' in locals() else '未知文件'}
 上传行数: {row_count}
 备份文件: {backup_filename}
 操作说明: 数据已成功{"清空并" if upload_mode == "replace" else ""}上传到 ClickHouse 数据库。
 如有疑问，请联系管理员。"""
 
         to_email = 'reno.guo@oceanwing.com'  # 固定日志接收邮箱
-        if send_email(to_email, log_subject, log_body,cc_emails=['yana.cao@oceanwing.com']):
+        if send_email(to_email, log_subject, log_body, cc_emails=['yana.cao@oceanwing.com']):
             st.info('操作日志已发送到指定邮箱。')
         else:
             st.warning('上传成功，但日志邮件发送失败。')
 
-        return f'成功: 已{operation_type} {row_count} 行数据到表 {table_name}。备份文件下载链接已在上方显示。'
+        return f'成功: 已{operation_type} {row_count} 行数据到表 {table_name}。'
 
     except Exception as e:
+        return f'上传失败: {str(e)}\n\n提示：检查权限或重建表后重试。'
+
+# 上传函数（备份 + 下载 + 确认逻辑）
+def upload_data(table_name, upload_mode, uploaded_file):
+    if uploaded_file is None:
+        return '请选择文件'
+
+    # 读取文件
+    try:
+        if uploaded_file.name.lower().endswith('.csv'):
+            df = pd.read_csv(uploaded_file)
+        elif uploaded_file.name.lower().endswith('.xlsx'):
+            df = pd.read_excel(uploaded_file)
+        else:
+            return '不支持的文件格式。请使用 CSV 或 XLSX。'
+
+        df = clean_data(df)
+
+        if df.empty:
+            return '文件为空或无有效数据'
+
+        expected_cols = ['Country', 'SKU', 'spend_contrbution', 'Profitable_ROAS', 'Breakeven_ROAS']
+        missing_cols = [col for col in expected_cols if col not in df.columns]
+        if missing_cols:
+            return f'文件缺少必要列: {", ".join(missing_cols)}。请确保文件列名为: {", ".join(expected_cols)}'
+
+        # 初始化 session_state 用于跟踪备份下载状态
+        if 'backup_downloaded' not in st.session_state:
+            st.session_state.backup_downloaded = False
+        if 'backup_buffer' not in st.session_state:
+            st.session_state.backup_buffer = None
+        if 'backup_filename' not in st.session_state:
+            st.session_state.backup_filename = None
+        if 'current_df' not in st.session_state:
+            st.session_state.current_df = None
+        if 'current_table' not in st.session_state:
+            st.session_state.current_table = None
+        if 'current_mode' not in st.session_state:
+            st.session_state.current_mode = None
+
+        # 如果未生成备份，先生成备份
+        if not st.session_state.backup_downloaded:
+            success, backup_info = backup_table_before_upload(table_name)
+            if not success:
+                return backup_info
+
+            st.session_state.backup_buffer, st.session_state.backup_filename = backup_info
+            st.session_state.current_df = df
+            st.session_state.current_table = table_name
+            st.session_state.current_mode = upload_mode
+
+            # 显示下载按钮
+            st.download_button(
+                label=f'下载备份文件: {st.session_state.backup_filename}',
+                data=st.session_state.backup_buffer,
+                file_name=st.session_state.backup_filename,
+                mime='text/csv'
+            )
+            st.warning('⚠️ 请先下载备份文件！下载后点击下方按钮继续上传。')
+
+            # 确认按钮：用户手动确认已下载
+            if st.button('我已下载备份文件，继续上传'):
+                st.session_state.backup_downloaded = True
+                st.rerun()  # 刷新页面执行上传
+
+            return '请下载备份文件后确认继续。'
+
+        else:
+            # 已确认下载，执行上传
+            result = perform_upload(st.session_state.current_table, st.session_state.current_mode, st.session_state.current_df, st.session_state.backup_filename)
+            # 上传完成后，重置状态
+            st.session_state.backup_downloaded = False
+            st.session_state.backup_buffer = None
+            st.session_state.backup_filename = None
+            st.session_state.current_df = None
+            st.session_state.current_table = None
+            st.session_state.current_mode = None
+            return result
+
+    except Exception as e:
+        # 异常时重置状态
+        st.session_state.backup_downloaded = False
         return f'上传失败: {str(e)}\n\n提示：检查权限或重建表后重试。'
 
 # Streamlit 主应用
@@ -361,7 +406,7 @@ def main():
             else:
                 st.error(result)
 
-        st.info('“导出空表模板”生成 XLSX 文件（只有表头）。上传前会自动生成备份并提供下载按钮。支持 CSV/XLSX。')
+        st.info('“导出空表模板”生成 XLSX 文件（只有表头）。上传前会自动生成备份，提供下载按钮，用户需手动确认下载后继续上传。支持 CSV/XLSX。')
 
 if __name__ == '__main__':
     main()
