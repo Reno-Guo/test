@@ -40,11 +40,11 @@ EMAIL_CONFIG = {
 
 # 表配置
 TABLES = {
-    'ASIN_goal_philips': 'ASIN 目标数据',
-    'ods_category': '类目数据',
-    'ods_asin_philips': 'ASIN 基础数据',
-    'SI_keyword_philips': 'SI 关键词数据',
-    'ods_goal_vcp': 'VCP 目标数据'
+    'ASIN_goal_philips': {'name': 'ASIN 目标数据', 'icon': '🎯', 'color': '#FF6B6B'},
+    'ods_category': {'name': '类目数据', 'icon': '📁', 'color': '#4ECDC4'},
+    'ods_asin_philips': {'name': 'ASIN 基础数据', 'icon': '📊', 'color': '#45B7D1'},
+    'SI_keyword_philips': {'name': 'SI 关键词数据', 'icon': '🔑', 'color': '#96CEB4'},
+    'ods_goal_vcp': {'name': 'VCP 目标数据', 'icon': '📈', 'color': '#FFEAA7'}
 }
 
 EXPECTED_COLUMNS = ['Country', 'SKU', 'spend_contrbution', 'Profitable_ROAS', 'Breakeven_ROAS']
@@ -61,37 +61,127 @@ def apply_custom_styles():
         /* 主标题 */
         .main-title {{
             color: {BRAND_COLOR};
-            font-size: 2.5rem;
+            font-size: 2.8rem;
             font-weight: 700;
             text-align: center;
-            padding: 1rem 0;
-            margin-bottom: 2rem;
+            padding: 1.5rem 0;
+            margin-bottom: 0.5rem;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
         }}
         
-        .sub-title {{
-            color: {SECONDARY_COLOR};
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin: 1.5rem 0 1rem 0;
-            border-left: 4px solid {BRAND_COLOR};
-            padding-left: 1rem;
+        .main-subtitle {{
+            text-align: center;
+            color: #666;
+            font-size: 1.1rem;
+            margin-bottom: 2.5rem;
+            font-weight: 400;
         }}
         
-        /* 卡片样式 */
-        .card {{
+        /* 分组标题 - 更轻量 */
+        .section-title {{
+            color: {BRAND_COLOR};
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin: 2rem 0 1rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid {BRAND_COLOR};
+            display: flex;
+            align-items: center;
+        }}
+        
+        .section-title .icon {{
+            margin-right: 0.5rem;
+            font-size: 1.5rem;
+        }}
+        
+        /* 轻量分割线 */
+        .divider {{
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #e0e0e0, transparent);
+            margin: 2rem 0;
+        }}
+        
+        .divider-thick {{
+            height: 2px;
+            background: linear-gradient(90deg, transparent, {BRAND_COLOR}, transparent);
+            margin: 2.5rem 0;
+            opacity: 0.3;
+        }}
+        
+        /* 表选择卡片 - 突出显示 */
+        .table-selector-container {{
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 8px 24px rgba(0,166,228,0.15);
+            margin-bottom: 2rem;
+            border: 2px solid {BRAND_COLOR};
+        }}
+        
+        .table-card {{
             background: white;
             border-radius: 12px;
             padding: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.07);
-            margin-bottom: 1.5rem;
-            border: 1px solid #e3e8ef;
-            transition: transform 0.2s, box-shadow 0.2s;
+            margin: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid #e0e0e0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }}
         
-        .card:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0,166,228,0.15);
+        .table-card:hover {{
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0,166,228,0.2);
+            border-color: {BRAND_COLOR};
+        }}
+        
+        .table-card-selected {{
+            border-color: {BRAND_COLOR};
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            box-shadow: 0 4px 16px rgba(0,166,228,0.3);
+        }}
+        
+        .table-icon {{
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            display: block;
+        }}
+        
+        .table-name {{
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.3rem;
+        }}
+        
+        .table-key {{
+            font-size: 0.85rem;
+            color: #666;
+            font-family: 'Courier New', monospace;
+            background: #f5f5f5;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+        }}
+        
+        /* 验证码卡片 - 保留强调 */
+        .auth-card {{
+            background: white;
+            border-radius: 16px;
+            padding: 2.5rem;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+            margin: 2rem auto;
+            max-width: 500px;
+            border-top: 4px solid {BRAND_COLOR};
+        }}
+        
+        /* 备份下载卡片 - 保留强调 */
+        .backup-card {{
+            background: linear-gradient(135deg, #fff5e6 0%, #ffe8cc 100%);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border: 2px solid {WARNING_COLOR};
+            box-shadow: 0 4px 12px rgba(255,152,0,0.2);
         }}
         
         /* 按钮样式 */
@@ -103,12 +193,12 @@ def apply_custom_styles():
             padding: 0.6rem 1.5rem;
             font-weight: 600;
             transition: all 0.3s;
-            box-shadow: 0 2px 4px rgba(0,166,228,0.3);
+            box-shadow: 0 2px 8px rgba(0,166,228,0.3);
         }}
         
         .stButton > button:hover {{
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,166,228,0.5);
+            box-shadow: 0 4px 12px rgba(0,166,228,0.5);
         }}
         
         .stDownloadButton > button {{
@@ -128,13 +218,14 @@ def apply_custom_styles():
         /* 输入框样式 */
         .stTextInput > div > div > input {{
             border-radius: 8px;
-            border: 2px solid #e3e8ef;
-            transition: border-color 0.3s;
+            border: 2px solid #e0e0e0;
+            transition: all 0.3s;
+            padding: 0.75rem;
         }}
         
         .stTextInput > div > div > input:focus {{
             border-color: {BRAND_COLOR};
-            box-shadow: 0 0 0 2px rgba(0,166,228,0.1);
+            box-shadow: 0 0 0 3px rgba(0,166,228,0.1);
         }}
         
         /* 文件上传器 */
@@ -144,12 +235,6 @@ def apply_custom_styles():
             background: #f8fcff;
         }}
         
-        /* 信息提示框 */
-        .stAlert {{
-            border-radius: 8px;
-            border-left: 4px solid {BRAND_COLOR};
-        }}
-        
         /* 选择框 */
         .stSelectbox > div > div {{
             border-radius: 8px;
@@ -157,43 +242,55 @@ def apply_custom_styles():
         
         /* Radio按钮 */
         .stRadio > div {{
+            background: transparent;
+            padding: 0;
+        }}
+        
+        .stRadio > div > label {{
             background: white;
-            padding: 1rem;
+            padding: 0.8rem 1.2rem;
             border-radius: 8px;
-            border: 2px solid #e3e8ef;
+            border: 2px solid #e0e0e0;
+            margin: 0.3rem 0;
+            transition: all 0.3s;
         }}
         
-        /* 进度条 */
-        .stProgress > div > div > div {{
-            background-color: {BRAND_COLOR};
+        .stRadio > div > label:hover {{
+            border-color: {BRAND_COLOR};
+            background: #f0f9ff;
         }}
         
-        /* 表格 */
-        .dataframe {{
+        /* 信息框优化 */
+        .stAlert {{
             border-radius: 8px;
-            overflow: hidden;
+            border-left: 4px solid {BRAND_COLOR};
         }}
         
-        /* 侧边栏 */
-        section[data-testid="stSidebar"] {{
-            background: linear-gradient(180deg, {BRAND_COLOR} 0%, {SECONDARY_COLOR} 100%);
+        /* 使用说明区域 */
+        .info-box {{
+            background: #f8f9fa;
+            border-left: 4px solid {BRAND_COLOR};
+            border-radius: 4px;
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            color: #666;
+            font-size: 0.95rem;
+            line-height: 1.8;
         }}
         
-        section[data-testid="stSidebar"] .stMarkdown {{
-            color: white;
+        .info-box ul {{
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
         }}
         
-        /* 图标样式 */
-        .icon {{
-            display: inline-block;
-            margin-right: 0.5rem;
-            font-size: 1.2rem;
+        .info-box li {{
+            margin: 0.3rem 0;
         }}
         
         /* 状态徽章 */
         .badge {{
             display: inline-block;
-            padding: 0.25rem 0.75rem;
+            padding: 0.3rem 0.8rem;
             border-radius: 12px;
             font-size: 0.875rem;
             font-weight: 600;
@@ -214,27 +311,6 @@ def apply_custom_styles():
             background: {BRAND_COLOR};
             color: white;
         }}
-        
-        /* 分隔线 */
-        hr {{
-            margin: 2rem 0;
-            border: none;
-            border-top: 2px solid #e3e8ef;
-        }}
-        
-        /* 步骤指示器 */
-        .step-indicator {{
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 2rem;
-            height: 2rem;
-            background: {BRAND_COLOR};
-            color: white;
-            border-radius: 50%;
-            font-weight: bold;
-            margin-right: 0.5rem;
-        }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -254,7 +330,8 @@ def init_session_state():
         'current_table': None,
         'current_mode': None,
         'current_uploaded_file': None,
-        'backup_download_confirmed': False
+        'backup_download_confirmed': False,
+        'selected_table': list(TABLES.keys())[0]
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -515,17 +592,52 @@ def upload_data(table_name, upload_mode, uploaded_file):
         return f'上传失败: {str(e)}'
 
 # ==================== UI组件 ====================
+def render_table_selector():
+    """渲染表选择器 - 卡片式"""
+    st.markdown('<div class="table-selector-container">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title"><span class="icon">📊</span>选择数据表</div>', unsafe_allow_html=True)
+    
+    cols = st.columns(len(TABLES))
+    
+    for idx, (table_key, table_info) in enumerate(TABLES.items()):
+        with cols[idx]:
+            is_selected = st.session_state.selected_table == table_key
+            card_class = "table-card table-card-selected" if is_selected else "table-card"
+            
+            if st.button(
+                f"{table_info['icon']}\n\n{table_info['name']}\n`{table_key}`",
+                key=f"table_{table_key}",
+                use_container_width=True
+            ):
+                st.session_state.selected_table = table_key
+                st.rerun()
+    
+    # 显示当前选择
+    selected_info = TABLES[st.session_state.selected_table]
+    st.markdown(f"""
+    <div style="margin-top: 1rem; padding: 1rem; background: #f0f9ff; border-radius: 8px; text-align: center;">
+        <span style="font-size: 1.5rem;">{selected_info['icon']}</span>
+        <strong style="color: {BRAND_COLOR}; margin-left: 0.5rem;">当前选择: {selected_info['name']}</strong>
+        <code style="margin-left: 0.5rem; background: white; padding: 0.2rem 0.6rem; border-radius: 4px;">{st.session_state.selected_table}</code>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    return st.session_state.selected_table
+
 def render_captcha_ui():
     """渲染验证码界面"""
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<h2 class="sub-title">🔐 邮件验证码验证</h2>', unsafe_allow_html=True)
-    
-    to_email = EMAIL_CONFIG['log_recipient']
-    
-    if not st.session_state.code_sent:
-        st.info(f'📧 验证码将发送到: **{to_email}**')
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown('<div class="auth-card">', unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align: center; margin-bottom: 1.5rem;"><span style="font-size: 3rem;">🔐</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<h2 style="text-align: center; color: {BRAND_COLOR}; margin-bottom: 1rem;">邮件验证码验证</h2>', unsafe_allow_html=True)
+        
+        to_email = EMAIL_CONFIG['log_recipient']
+        
+        if not st.session_state.code_sent:
+            st.info(f'📧 验证码将发送到: **{to_email}**')
             if st.button('📨 发送验证码', use_container_width=True):
                 with st.spinner('正在发送验证码...'):
                     code = generate_code()
@@ -535,56 +647,47 @@ def render_captcha_ui():
                         st.session_state.code_sent = True
                         st.success(f'✅ 验证码已发送到 {to_email}')
                         st.rerun()
-    else:
-        col1, col2 = st.columns([3, 1])
-        with col1:
+        else:
             user_input = st.text_input('🔢 输入验证码:', max_chars=6, 
                                       placeholder='请输入6位数字验证码')
-        with col2:
-            st.write('')
-            st.write('')
-            if st.button('✓ 验证', use_container_width=True):
-                now = datetime.now()
-                if now > st.session_state.captcha_expiry:
-                    st.error('⏰ 验证码已过期。请重新发送。')
-                    st.session_state.code_sent = False
-                    st.session_state.captcha_code = None
-                    st.session_state.captcha_expiry = None
-                elif user_input == st.session_state.captcha_code:
-                    st.session_state.captcha_verified = True
-                    st.success('✅ 验证码正确!')
-                    st.balloons()
-                    st.rerun()
-                else:
-                    st.error('❌ 验证码错误,请重试。')
+            
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if st.button('✓ 验证', use_container_width=True):
+                    now = datetime.now()
+                    if now > st.session_state.captcha_expiry:
+                        st.error('⏰ 验证码已过期。请重新发送。')
+                        st.session_state.code_sent = False
+                        st.session_state.captcha_code = None
+                        st.session_state.captcha_expiry = None
+                    elif user_input == st.session_state.captcha_code:
+                        st.session_state.captcha_verified = True
+                        st.success('✅ 验证码正确!')
+                        st.balloons()
+                        st.rerun()
+                    else:
+                        st.error('❌ 验证码错误,请重试。')
+            
+            with col_b:
+                if st.button('🔄 重新发送', use_container_width=True):
+                    code = generate_code()
+                    if send_email_code(to_email, code):
+                        st.session_state.captcha_code = code
+                        st.session_state.captcha_expiry = datetime.now() + timedelta(minutes=5)
+                        st.success('✅ 新验证码已发送。')
         
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            if st.button('🔄 重新发送验证码', use_container_width=True):
-                code = generate_code()
-                if send_email_code(to_email, code):
-                    st.session_state.captcha_code = code
-                    st.session_state.captcha_expiry = datetime.now() + timedelta(minutes=5)
-                    st.success('✅ 新验证码已发送。')
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 def render_main_ui():
     """渲染主界面"""
     # 表选择区域
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<h2 class="sub-title">📊 选择数据表</h2>', unsafe_allow_html=True)
+    table_name = render_table_selector()
     
-    table_options = [f"{name} ({desc})" for name, desc in TABLES.items()]
-    selected_option = st.selectbox('请选择要操作的表:', table_options, 
-                                   label_visibility="collapsed")
-    table_name = list(TABLES.keys())[table_options.index(selected_option)]
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+    # 分割线
+    st.markdown('<div class="divider-thick"></div>', unsafe_allow_html=True)
     
     # 导出功能区域
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<h2 class="sub-title">📥 数据导出</h2>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title"><span class="icon">📥</span>数据导出</div>', unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
     with col1:
@@ -617,11 +720,11 @@ def render_main_ui():
                         use_container_width=True
                     )
     
-    st.markdown('</div>', unsafe_allow_html=True)
+    # 分割线
+    st.markdown('<div class="divider-thick"></div>', unsafe_allow_html=True)
     
     # 上传功能区域
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<h2 class="sub-title">📤 数据上传</h2>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title"><span class="icon">📤</span>数据上传</div>', unsafe_allow_html=True)
     
     st.markdown('**步骤 1: 选择上传方式**')
     upload_mode = st.radio(
@@ -631,6 +734,8 @@ def render_main_ui():
         label_visibility="collapsed"
     )
     upload_mode = 'replace' if '覆盖' in upload_mode else 'append'
+    
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
     
     st.markdown('**步骤 2: 选择文件**')
     uploaded_file = st.file_uploader(
@@ -642,6 +747,8 @@ def render_main_ui():
     
     if uploaded_file:
         st.success(f'✅ 已选择文件: **{uploaded_file.name}**')
+    
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
     
     st.markdown('**步骤 3: 开始上传**')
     if st.button('🚀 开始上传数据', type='primary', use_container_width=True):
@@ -655,12 +762,11 @@ def render_main_ui():
             elif result:
                 st.error(f'❌ {result}')
     
-    st.markdown('</div>', unsafe_allow_html=True)
-    
     # 备份下载区域
     if st.session_state.get('backup_generated', False):
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown('<h2 class="sub-title">💾 备份文件下载</h2>', unsafe_allow_html=True)
+        st.markdown('<div class="divider-thick"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="backup-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title"><span class="icon">💾</span>备份文件下载</div>', unsafe_allow_html=True)
         
         st.warning(f'⚠️ 备份文件已生成{st.session_state.backup_row_msg}')
         st.info('📌 **重要提示**: 请先下载备份文件,然后勾选确认框,最后点击"继续上传"按钮。')
@@ -714,18 +820,23 @@ def render_main_ui():
         
         st.markdown('</div>', unsafe_allow_html=True)
     
+    # 分割线
+    st.markdown('<div class="divider-thick"></div>', unsafe_allow_html=True)
+    
     # 使用说明
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<h2 class="sub-title">📖 使用说明</h2>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title"><span class="icon">📖</span>使用说明</div>', unsafe_allow_html=True)
     st.markdown("""
-    - **导出空表模板**: 生成包含列名的空 XLSX 文件,方便填写数据
-    - **下载全表数据**: 导出当前表的所有数据为 CSV 文件
-    - **覆盖模式**: 清空表中所有数据后上传新数据
-    - **续表模式**: 将新数据追加到现有数据之后
-    - **备份机制**: 上传前会自动创建备份,必须下载后才能继续
-    - **操作日志**: 每次上传操作都会发送邮件日志到管理员
-    """)
-    st.markdown('</div>', unsafe_allow_html=True)
+    <div class="info-box">
+    <ul>
+        <li><strong>导出空表模板</strong>: 生成包含列名的空 XLSX 文件,方便填写数据</li>
+        <li><strong>下载全表数据</strong>: 导出当前表的所有数据为 CSV 文件</li>
+        <li><strong>覆盖模式</strong>: 清空表中所有数据后上传新数据</li>
+        <li><strong>续表模式</strong>: 将新数据追加到现有数据之后</li>
+        <li><strong>备份机制</strong>: 上传前会自动创建备份,必须下载后才能继续</li>
+        <li><strong>操作日志</strong>: 每次上传操作都会发送邮件日志到管理员</li>
+    </ul>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ==================== 主程序 ====================
 def main():
@@ -740,14 +851,12 @@ def main():
     init_session_state()
     
     # 标题
-    st.markdown('<h1 class="main-title">📊 Philips Database Manager</h1>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align: center; color: #666; margin-bottom: 2rem;">semanticdb_haiyi 数据库管理系统</p>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-title">📊 Database Manager</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="main-subtitle">semanticdb_haiyi 数据库管理系统</p>', unsafe_allow_html=True)
     
     # 验证码验证
     if not st.session_state.captcha_verified:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            render_captcha_ui()
+        render_captcha_ui()
     else:
         render_main_ui()
 
