@@ -94,7 +94,7 @@ def export_full_table(table_name):
     except Exception as e:
         return None, f'导出失败: {str(e)}'
 
-# 自动备份全表（用于上传前强制下载）
+# 自动备份全表（生成 BytesIO buffer 用于下载，不再保存到本地文件）
 def backup_table_before_upload(table_name):
     try:
         engine = get_engine()
@@ -102,15 +102,19 @@ def backup_table_before_upload(table_name):
             return False, f'表 {table_name} 不存在。'
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_file = f'{table_name}_backup_{timestamp}.csv'
+        backup_filename = f'{table_name}_backup_{timestamp}.csv'
 
         query = text(f"SELECT * FROM {table_name}")
         with engine.connect() as conn:
             df = pd.read_sql(query, conn)
 
-        df.to_csv(backup_file, index=False, encoding='utf-8')
-        st.success(f"备份文件 {backup_file} 已创建，包含 {len(df)} 行数据。" if not df.empty else f"备份文件 {backup_file} 已创建（表为空）。")
-        return True, backup_file  # 返回备份文件名用于日志
+        # 生成 BytesIO buffer（内存中，不保存文件）
+        output_buffer = io.BytesIO()
+        df.to_csv(output_buffer, index=False, encoding='utf-8')
+        output_buffer.seek(0)
+
+        st.success(f"备份已生成，包含 {len(df)} 行数据。请立即下载备份文件以防丢失。" if not df.empty else f"备份已生成（表为空）。请立即下载备份文件。")
+        return True, (output_buffer, backup_filename)
     except Exception as e:
         return False, f'备份失败: {str(e)}'
 
@@ -203,12 +207,21 @@ def upload_data(table_name, upload_mode, uploaded_file):
                 grant_sql += "\nGRANT TRUNCATE ON semanticdb_haiyi.{table_name} TO haiyi;"
             return f'权限不足。请联系管理员执行:\n{grant_sql}'
 
-        # 强制备份
+        # 强制备份（返回 buffer 和 filename）
         success, backup_info = backup_table_before_upload(table_name)
         if not success:
             return backup_info
 
-        backup_file = backup_info if isinstance(backup_info, str) else None
+        backup_buffer, backup_filename = backup_info
+
+        # 显示下载按钮（备份生成后立即提供下载）
+        st.download_button(
+            label=f'立即下载备份文件: {backup_filename}',
+            data=backup_buffer,
+            file_name=backup_filename,
+            mime='text/csv'
+        )
+        st.info('⚠️ 请立即点击上方按钮下载备份文件！上传操作将继续进行。')
 
         # 处理上传模式
         with engine.connect() as conn:
@@ -236,7 +249,7 @@ def upload_data(table_name, upload_mode, uploaded_file):
 操作表名: {table_name}
 上传文件: {uploaded_file.name}
 上传行数: {row_count}
-备份文件: {backup_file if backup_file else '无（表为空）'}
+备份文件: {backup_filename}
 操作说明: 数据已成功{"清空并" if upload_mode == "replace" else ""}上传到 ClickHouse 数据库。
 如有疑问，请联系管理员。"""
 
@@ -246,7 +259,7 @@ def upload_data(table_name, upload_mode, uploaded_file):
         else:
             st.warning('上传成功，但日志邮件发送失败。')
 
-        return f'成功: 已{operation_type} {row_count} 行数据到表 {table_name}'
+        return f'成功: 已{operation_type} {row_count} 行数据到表 {table_name}。备份文件下载链接已在上方显示。'
 
     except Exception as e:
         return f'上传失败: {str(e)}\n\n提示：检查权限或重建表后重试。'
@@ -343,7 +356,7 @@ def main():
             else:
                 st.error(result)
 
-        st.info('“导出空表模板”生成 XLSX 文件（只有表头），填写后上传。上传前会自动备份原表到本地。支持 CSV/XLSX。')
+        st.info('“导出空表模板”生成 XLSX 文件（只有表头），填写后上传。上传前会自动生成备份并提供下载按钮（内存中生成，便于 Web 端下载）。支持 CSV/XLSX。')
 
 if __name__ == '__main__':
     main()
