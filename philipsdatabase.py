@@ -187,6 +187,7 @@ def upload_data(table_name, upload_mode, uploaded_file):
         return f'上传失败: {str(e)}\n\n提示：检查权限或重建表后重试。'
 
 # 发送邮件验证码函数
+# 发送邮件验证码函数
 def send_email_code(to_email, code):
     # 配置你的 SMTP 服务器细节（替换为你的实际配置）
     smtp_server = 'smtp.feishu.cn'
@@ -203,8 +204,9 @@ def send_email_code(to_email, code):
     msg['To'] = to_email
 
     try:
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
+        # 关键修改：使用 SMTP_SSL for 端口 465 (SSL)
+        import smtplib  # 确保导入
+        with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
             server.login(sender_email, sender_password)
             server.sendmail(sender_email, to_email, msg.as_string())
         return True
