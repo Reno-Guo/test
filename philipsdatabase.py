@@ -137,7 +137,7 @@ def clean_data(df):
     return df
 
 # 通用发送邮件函数
-def send_email(to_email, subject, body):
+def send_email(to_email, subject, body, cc_emails=None):  # 新增：cc_emails=None（可选，默认无抄送）
     # 配置你的 SMTP 服务器细节（替换为你的实际配置）
     smtp_server = 'smtp.feishu.cn'
     smtp_port = 465
@@ -150,7 +150,7 @@ def send_email(to_email, subject, body):
     msg['To'] = to_email
 
     # 新增：添加 CC 头（如果有）
-    if cc_emails:
+    if cc_emails:  # 已改为 if cc_emails: （None 或空列表时跳过）
         msg['Cc'] = ', '.join(cc_emails)
 
     try:
