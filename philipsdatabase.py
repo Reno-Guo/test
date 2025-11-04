@@ -187,17 +187,16 @@ def upload_data(table_name, upload_mode, uploaded_file):
         return f'上传失败: {str(e)}\n\n提示：检查权限或重建表后重试。'
 
 # 发送邮件验证码函数
-# 发送邮件验证码函数
 def send_email_code(to_email, code):
     # 配置你的 SMTP 服务器细节（替换为你的实际配置）
     smtp_server = 'smtp.feishu.cn'
     smtp_port = 465
     sender_email = 'reno.guo@oceanwing.com'  # 替换为你的发件人邮箱
-    sender_password = 'd7Zezl9LqUXCP5xe'  # 替换为你的应用密码（非邮箱密码；Gmail 需要启用 2FA 并生成应用密码）
+    sender_password = 'd7Zezl9LqUXCP5xe'  # 替换为你的应用密码
 
     # 邮件内容
     subject = '飞利浦数据库操作程序验证码'
-    body = f'您的验证码是: {code}\n有效期: 5 分钟'
+    body = f'您的验证码是: {code}\n有效期: 5 分钟\n\n发送时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
     msg = MIMEText(body, 'plain', 'utf-8')
     msg['Subject'] = Header(subject, 'utf-8')
     msg['From'] = sender_email
