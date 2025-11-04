@@ -841,7 +841,7 @@ def render_main_ui():
 # ==================== 主程序 ====================
 def main():
     st.set_page_config(
-        page_title="Philips Database Manager",
+        page_title="Database Manager",
         page_icon="📊",
         layout="wide",
         initial_sidebar_state="collapsed"
@@ -853,6 +853,9 @@ def main():
     # 标题
     st.markdown('<h1 class="main-title">📊 Database Manager</h1>', unsafe_allow_html=True)
     st.markdown('<p class="main-subtitle">semanticdb_haiyi 数据库管理系统</p>', unsafe_allow_html=True)
+    
+    # 轻量分割线
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
     
     # 验证码验证
     if not st.session_state.captcha_verified:
