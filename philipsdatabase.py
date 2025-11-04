@@ -141,8 +141,8 @@ def send_email(to_email, subject, body, cc_emails=None):
     # 配置你的 SMTP 服务器细节（替换为你的实际配置）
     smtp_server = 'smtp.feishu.cn'
     smtp_port = 465
-    sender_email = 'reno.guo@oceanwing.com'  # 替换为你的发件人邮箱
-    sender_password = 'd7Zezl9LqUXCP5xe'  # 替换为你的应用密码
+    sender_email = 'idc_ow@oceanwing.com'  # 替换为你的发件人邮箱
+    sender_password = 'OkTIL1AxudQ2y2tC'  # 替换为你的应用密码
 
     msg = MIMEText(body, 'plain', 'utf-8')
     msg['Subject'] = Header(subject, 'utf-8')
