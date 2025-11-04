@@ -169,7 +169,7 @@ def send_email(to_email, subject, body):
 def send_email_code(to_email, code):
     beijing_time = datetime.now(beijing_tz)
     # 邮件内容
-    subject = '数据库操作程序验证码'
+    subject = 'semanticdb_haiyi数据库操作程序验证码'
     body = f'您的验证码是: {code}\n有效期: 5 分钟\n\n发送时间: {beijing_time.strftime("%Y-%m-%d %H:%M:%S")} (北京时间)'
     return send_email(to_email, subject, body)
 
@@ -246,7 +246,7 @@ def upload_data(table_name, upload_mode, uploaded_file):
         beijing_time = datetime.now(beijing_tz)
         operation_type = '覆盖 (Replace)' if upload_mode == 'replace' else '续表 (Append)'
         row_count = len(df)
-        log_subject = '飞利浦数据库上传操作日志'
+        log_subject = 'semanticdb_haiyi数据库上传操作日志'
         log_body = f"""数据库上传操作日志
 
 操作时间: {beijing_time.strftime("%Y-%m-%d %H:%M:%S")} (北京时间)
