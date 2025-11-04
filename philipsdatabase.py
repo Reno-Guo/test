@@ -239,7 +239,9 @@ def upload_data(table_name, upload_mode, uploaded_file):
 
     # 初始化 session_state 用于跟踪备份下载状态
     if 'backup_step' not in st.session_state:
-        st.session_state.backup_step = 'none'  # 'none', 'backup_generated', 'download_confirmed'
+        st.session_state.backup_step = 'none'  # 'none', 'backup_generated'
+    if 'download_confirmed' not in st.session_state:
+        st.session_state.download_confirmed = False
     if 'backup_buffer' not in st.session_state:
         st.session_state.backup_buffer = None
     if 'backup_filename' not in st.session_state:
@@ -277,6 +279,7 @@ def upload_data(table_name, upload_mode, uploaded_file):
         # 如果是新上传，重置步骤
         if st.session_state.backup_step == 'none':
             st.session_state.backup_step = 'backup_generated'
+            st.session_state.download_confirmed = False
             st.session_state.current_df = df
             st.session_state.current_table = table_name
             st.session_state.current_mode = upload_mode
@@ -304,38 +307,42 @@ def upload_data(table_name, upload_mode, uploaded_file):
                     use_container_width=True
                 )
             with col2:
-                st.info('下载后，点击下方按钮继续。')
+                st.info('下载完成后，勾选下方确认并点击继续上传。')
 
-            # 继续按钮：只有在用户确认下载后显示（但由于无法自动检测，仍需手动点击）
-            if st.button('✅ 我已下载备份文件，继续上传', type='primary'):
-                st.session_state.backup_step = 'download_confirmed'
-                st.rerun()
+            # 确认 checkbox 和继续按钮（只有备份生成后显示，继续按钮仅在确认时显示）
+            confirmed = st.checkbox('✅ 我已下载备份文件')
+            if confirmed:
+                if st.button('继续上传', type='primary'):
+                    st.session_state.download_confirmed = True
+                    st.rerun()
+
+            if st.session_state.download_confirmed:
+                # 执行上传
+                result = perform_upload(
+                    st.session_state.current_table, 
+                    st.session_state.current_mode, 
+                    st.session_state.current_df, 
+                    st.session_state.current_uploaded_file,
+                    st.session_state.backup_filename
+                )
+                # 上传完成后，重置状态
+                st.session_state.backup_step = 'none'
+                st.session_state.download_confirmed = False
+                st.session_state.backup_buffer = None
+                st.session_state.backup_filename = None
+                st.session_state.backup_row_msg = ''
+                st.session_state.current_df = None
+                st.session_state.current_table = None
+                st.session_state.current_mode = None
+                st.session_state.current_uploaded_file = None
+                return result
 
             return None  # 不返回消息，等待用户交互
-
-        # 步骤2: 已确认下载，执行上传
-        elif st.session_state.backup_step == 'download_confirmed':
-            result = perform_upload(
-                st.session_state.current_table, 
-                st.session_state.current_mode, 
-                st.session_state.current_df, 
-                st.session_state.current_uploaded_file,
-                st.session_state.backup_filename
-            )
-            # 上传完成后，重置状态
-            st.session_state.backup_step = 'none'
-            st.session_state.backup_buffer = None
-            st.session_state.backup_filename = None
-            st.session_state.backup_row_msg = ''
-            st.session_state.current_df = None
-            st.session_state.current_table = None
-            st.session_state.current_mode = None
-            st.session_state.current_uploaded_file = None
-            return result
 
     except Exception as e:
         # 异常时重置状态
         st.session_state.backup_step = 'none'
+        st.session_state.download_confirmed = False
         return f'上传失败: {str(e)}\n\n提示：检查权限或重建表后重试。'
 
 # Streamlit 主应用
@@ -430,7 +437,7 @@ def main():
             elif result:
                 st.error(result)
 
-        st.info('“导出空表模板”生成 XLSX 文件（只有表头）。上传前会生成备份，提供下载按钮。点击下载后，手动确认继续上传。支持 CSV/XLSX。')
+        st.info('“导出空表模板”生成 XLSX 文件（只有表头）。上传前会生成备份，提供下载按钮。下载后勾选确认并点击继续上传。支持 CSV/XLSX。')
 
 if __name__ == '__main__':
     main()
