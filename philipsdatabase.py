@@ -113,8 +113,8 @@ def backup_table_before_upload(table_name):
         df.to_csv(output_buffer, index=False, encoding='utf-8')
         output_buffer.seek(0)
 
-        st.success(f"备份已生成，包含 {len(df)} 行数据。请立即下载备份文件以防丢失。" if not df.empty else f"备份已生成（表为空）。请立即下载备份文件。")
-        return True, (output_buffer, backup_filename)
+        row_count_msg = f"，包含 {len(df)} 行数据" if not df.empty else "（表为空）"
+        return True, (output_buffer, backup_filename, row_count_msg)
     except Exception as e:
         return False, f'备份失败: {str(e)}'
 
@@ -178,7 +178,7 @@ def generate_code():
     return ''.join(random.choices('0123456789', k=6))  # 6位数字验证码
 
 # 执行上传逻辑（仅在确认下载后调用）
-def perform_upload(table_name, upload_mode, df, backup_filename):
+def perform_upload(table_name, upload_mode, df, uploaded_file, backup_filename):
     try:
         engine = get_engine()
 
@@ -215,7 +215,7 @@ def perform_upload(table_name, upload_mode, df, backup_filename):
 操作时间: {beijing_time.strftime("%Y-%m-%d %H:%M:%S")} (北京时间)
 操作类型: {operation_type}
 操作表名: {table_name}
-上传文件: {uploaded_file.name if 'uploaded_file' in locals() else '未知文件'}
+上传文件: {uploaded_file.name}
 上传行数: {row_count}
 备份文件: {backup_filename}
 操作说明: 数据已成功{"清空并" if upload_mode == "replace" else ""}上传到 ClickHouse 数据库。
@@ -237,7 +237,25 @@ def upload_data(table_name, upload_mode, uploaded_file):
     if uploaded_file is None:
         return '请选择文件'
 
-    # 读取文件
+    # 初始化 session_state 用于跟踪备份下载状态
+    if 'backup_step' not in st.session_state:
+        st.session_state.backup_step = 'none'  # 'none', 'backup_generated', 'download_confirmed'
+    if 'backup_buffer' not in st.session_state:
+        st.session_state.backup_buffer = None
+    if 'backup_filename' not in st.session_state:
+        st.session_state.backup_filename = None
+    if 'backup_row_msg' not in st.session_state:
+        st.session_state.backup_row_msg = ''
+    if 'current_df' not in st.session_state:
+        st.session_state.current_df = None
+    if 'current_table' not in st.session_state:
+        st.session_state.current_table = None
+    if 'current_mode' not in st.session_state:
+        st.session_state.current_mode = None
+    if 'current_uploaded_file' not in st.session_state:
+        st.session_state.current_uploaded_file = None
+
+    # 读取文件（仅在需要时）
     try:
         if uploaded_file.name.lower().endswith('.csv'):
             df = pd.read_csv(uploaded_file)
@@ -256,62 +274,68 @@ def upload_data(table_name, upload_mode, uploaded_file):
         if missing_cols:
             return f'文件缺少必要列: {", ".join(missing_cols)}。请确保文件列名为: {", ".join(expected_cols)}'
 
-        # 初始化 session_state 用于跟踪备份下载状态
-        if 'backup_downloaded' not in st.session_state:
-            st.session_state.backup_downloaded = False
-        if 'backup_buffer' not in st.session_state:
-            st.session_state.backup_buffer = None
-        if 'backup_filename' not in st.session_state:
-            st.session_state.backup_filename = None
-        if 'current_df' not in st.session_state:
-            st.session_state.current_df = None
-        if 'current_table' not in st.session_state:
-            st.session_state.current_table = None
-        if 'current_mode' not in st.session_state:
-            st.session_state.current_mode = None
-
-        # 如果未生成备份，先生成备份
-        if not st.session_state.backup_downloaded:
-            success, backup_info = backup_table_before_upload(table_name)
-            if not success:
-                return backup_info
-
-            st.session_state.backup_buffer, st.session_state.backup_filename = backup_info
+        # 如果是新上传，重置步骤
+        if st.session_state.backup_step == 'none':
+            st.session_state.backup_step = 'backup_generated'
             st.session_state.current_df = df
             st.session_state.current_table = table_name
             st.session_state.current_mode = upload_mode
+            st.session_state.current_uploaded_file = uploaded_file
 
-            # 显示下载按钮
-            st.download_button(
-                label=f'下载备份文件: {st.session_state.backup_filename}',
-                data=st.session_state.backup_buffer,
-                file_name=st.session_state.backup_filename,
-                mime='text/csv'
+        # 步骤1: 生成备份（仅首次）
+        if st.session_state.backup_step == 'backup_generated':
+            success, backup_info = backup_table_before_upload(table_name)
+            if not success:
+                st.session_state.backup_step = 'none'  # 重置
+                return backup_info
+
+            st.session_state.backup_buffer, st.session_state.backup_filename, st.session_state.backup_row_msg = backup_info
+
+            st.info(f'备份文件已生成{st.session_state.backup_row_msg}。')
+
+            # 显示下载按钮（突出显示）
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.download_button(
+                    label=f'📥 点击下载备份文件: {st.session_state.backup_filename}',
+                    data=st.session_state.backup_buffer,
+                    file_name=st.session_state.backup_filename,
+                    mime='text/csv',
+                    use_container_width=True
+                )
+            with col2:
+                st.info('下载后，点击下方按钮继续。')
+
+            # 继续按钮：只有在用户确认下载后显示（但由于无法自动检测，仍需手动点击）
+            if st.button('✅ 我已下载备份文件，继续上传', type='primary'):
+                st.session_state.backup_step = 'download_confirmed'
+                st.rerun()
+
+            return None  # 不返回消息，等待用户交互
+
+        # 步骤2: 已确认下载，执行上传
+        elif st.session_state.backup_step == 'download_confirmed':
+            result = perform_upload(
+                st.session_state.current_table, 
+                st.session_state.current_mode, 
+                st.session_state.current_df, 
+                st.session_state.current_uploaded_file,
+                st.session_state.backup_filename
             )
-            st.warning('⚠️ 请先下载备份文件！下载后点击下方按钮继续上传。')
-
-            # 确认按钮：用户手动确认已下载
-            if st.button('我已下载备份文件，继续上传'):
-                st.session_state.backup_downloaded = True
-                st.rerun()  # 刷新页面执行上传
-
-            return '请下载备份文件后确认继续。'
-
-        else:
-            # 已确认下载，执行上传
-            result = perform_upload(st.session_state.current_table, st.session_state.current_mode, st.session_state.current_df, st.session_state.backup_filename)
             # 上传完成后，重置状态
-            st.session_state.backup_downloaded = False
+            st.session_state.backup_step = 'none'
             st.session_state.backup_buffer = None
             st.session_state.backup_filename = None
+            st.session_state.backup_row_msg = ''
             st.session_state.current_df = None
             st.session_state.current_table = None
             st.session_state.current_mode = None
+            st.session_state.current_uploaded_file = None
             return result
 
     except Exception as e:
         # 异常时重置状态
-        st.session_state.backup_downloaded = False
+        st.session_state.backup_step = 'none'
         return f'上传失败: {str(e)}\n\n提示：检查权限或重建表后重试。'
 
 # Streamlit 主应用
@@ -401,12 +425,12 @@ def main():
 
         if st.button('上传数据'):
             result = upload_data(table_name, upload_mode, uploaded_file)
-            if '成功' in result:
+            if result and '成功' in result:
                 st.success(result)
-            else:
+            elif result:
                 st.error(result)
 
-        st.info('“导出空表模板”生成 XLSX 文件（只有表头）。上传前会自动生成备份，提供下载按钮，用户需手动确认下载后继续上传。支持 CSV/XLSX。')
+        st.info('“导出空表模板”生成 XLSX 文件（只有表头）。上传前会生成备份，提供下载按钮。点击下载后，手动确认继续上传。支持 CSV/XLSX。')
 
 if __name__ == '__main__':
     main()
