@@ -9,6 +9,10 @@ import smtplib
 from email.mime.text import MIMEText
 from email.header import Header
 import io
+import pytz
+
+# 北京时区
+beijing_tz = pytz.timezone('Asia/Shanghai')
 
 # 数据库连接配置（你的新凭证）
 def get_engine():
@@ -106,7 +110,7 @@ def backup_table_before_upload(table_name):
 
         df.to_csv(backup_file, index=False, encoding='utf-8')
         st.success(f"备份文件 {backup_file} 已创建，包含 {len(df)} 行数据。" if not df.empty else f"备份文件 {backup_file} 已创建（表为空）。")
-        return True, None
+        return True, backup_file  # 返回备份文件名用于日志
     except Exception as e:
         return False, f'备份失败: {str(e)}'
 
@@ -127,6 +131,42 @@ def clean_data(df):
         df['SKU'] = df['SKU'].astype(str).str.strip()
 
     return df
+
+# 通用发送邮件函数
+def send_email(to_email, subject, body):
+    # 配置你的 SMTP 服务器细节（替换为你的实际配置）
+    smtp_server = 'smtp.feishu.cn'
+    smtp_port = 465
+    sender_email = 'reno.guo@oceanwing.com'  # 替换为你的发件人邮箱
+    sender_password = 'd7Zezl9LqUXCP5xe'  # 替换为你的应用密码
+
+    msg = MIMEText(body, 'plain', 'utf-8')
+    msg['Subject'] = Header(subject, 'utf-8')
+    msg['From'] = sender_email
+    msg['To'] = to_email
+
+    try:
+        # 关键修改：使用 SMTP_SSL for 端口 465 (SSL)
+        import smtplib  # 确保导入
+        with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, to_email, msg.as_string())
+        return True
+    except Exception as e:
+        st.error(f'发送邮件失败: {str(e)}')
+        return False
+
+# 发送邮件验证码函数（使用北京时间）
+def send_email_code(to_email, code):
+    beijing_time = datetime.now(beijing_tz)
+    # 邮件内容
+    subject = '飞利浦数据库操作程序验证码'
+    body = f'您的验证码是: {code}\n有效期: 5 分钟\n\n发送时间: {beijing_time.strftime("%Y-%m-%d %H:%M:%S")} (北京时间)'
+    return send_email(to_email, subject, body)
+
+# 生成验证码
+def generate_code():
+    return ''.join(random.choices('0123456789', k=6))  # 6位数字验证码
 
 # 上传函数（使用 TRUNCATE + APPEND 实现替换）
 def upload_data(table_name, upload_mode, uploaded_file):
@@ -164,9 +204,11 @@ def upload_data(table_name, upload_mode, uploaded_file):
             return f'权限不足。请联系管理员执行:\n{grant_sql}'
 
         # 强制备份
-        success, error = backup_table_before_upload(table_name)
+        success, backup_info = backup_table_before_upload(table_name)
         if not success:
-            return error
+            return backup_info
+
+        backup_file = backup_info if isinstance(backup_info, str) else None
 
         # 处理上传模式
         with engine.connect() as conn:
@@ -181,41 +223,33 @@ def upload_data(table_name, upload_mode, uploaded_file):
 
             # 插入数据
             df.to_sql(table_name, engine, if_exists='append', index=False)
-            return f'成功: 已{"清空并插入" if upload_mode == "replace" else "追加"} {len(df)} 行数据到表 {table_name}'
+
+        # 上传成功，发送操作日志邮件
+        beijing_time = datetime.now(beijing_tz)
+        operation_type = '覆盖 (Replace)' if upload_mode == 'replace' else '续表 (Append)'
+        row_count = len(df)
+        log_subject = '飞利浦数据库上传操作日志'
+        log_body = f"""数据库上传操作日志
+
+操作时间: {beijing_time.strftime("%Y-%m-%d %H:%M:%S")} (北京时间)
+操作类型: {operation_type}
+操作表名: {table_name}
+上传文件: {uploaded_file.name}
+上传行数: {row_count}
+备份文件: {backup_file if backup_file else '无（表为空）'}
+操作说明: 数据已成功{"清空并" if upload_mode == "replace" else ""}上传到 ClickHouse 数据库。
+如有疑问，请联系管理员。"""
+
+        to_email = 'reno.guo@oceanwing.com'  # 固定日志接收邮箱
+        if send_email(to_email, log_subject, log_body):
+            st.info('操作日志已发送到指定邮箱。')
+        else:
+            st.warning('上传成功，但日志邮件发送失败。')
+
+        return f'成功: 已{operation_type} {row_count} 行数据到表 {table_name}'
 
     except Exception as e:
         return f'上传失败: {str(e)}\n\n提示：检查权限或重建表后重试。'
-
-# 发送邮件验证码函数
-def send_email_code(to_email, code):
-    # 配置你的 SMTP 服务器细节（替换为你的实际配置）
-    smtp_server = 'smtp.feishu.cn'
-    smtp_port = 465
-    sender_email = 'reno.guo@oceanwing.com'  # 替换为你的发件人邮箱
-    sender_password = 'd7Zezl9LqUXCP5xe'  # 替换为你的应用密码
-
-    # 邮件内容
-    subject = '飞利浦数据库操作程序验证码'
-    body = f'您的验证码是: {code}\n有效期: 5 分钟\n\n发送时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
-    msg = MIMEText(body, 'plain', 'utf-8')
-    msg['Subject'] = Header(subject, 'utf-8')
-    msg['From'] = sender_email
-    msg['To'] = to_email
-
-    try:
-        # 关键修改：使用 SMTP_SSL for 端口 465 (SSL)
-        import smtplib  # 确保导入
-        with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
-            server.login(sender_email, sender_password)
-            server.sendmail(sender_email, to_email, msg.as_string())
-        return True
-    except Exception as e:
-        st.error(f'发送邮件失败: {str(e)}')
-        return False
-
-# 生成验证码
-def generate_code():
-    return ''.join(random.choices('0123456789', k=6))  # 6位数字验证码
 
 # Streamlit 主应用
 def main():
@@ -309,7 +343,7 @@ def main():
             else:
                 st.error(result)
 
-        st.info('“导出空表模板”生成 XLSX 文件（只有表头），填写后上传。上传前会自动备份原表到本地（以时间戳命名CSV文件）。支持 CSV/XLSX。')
+        st.info('“导出空表模板”生成 XLSX 文件（只有表头），填写后上传。上传前会自动备份原表到本地。支持 CSV/XLSX。')
 
 if __name__ == '__main__':
     main()
