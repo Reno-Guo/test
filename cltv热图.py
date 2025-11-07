@@ -26,6 +26,11 @@ if uploaded_file is not None:
     @st.cache_data
     def preprocess_data(df):
         df = df.copy()
+        # Ensure numeric columns are properly typed
+        df['new_user_count'] = pd.to_numeric(df['new_user_count'], errors='coerce').fillna(0).astype(int)
+        df['active_users'] = pd.to_numeric(df['active_users'], errors='coerce').fillna(0).astype(int)
+        df['total_sales'] = pd.to_numeric(df['total_sales'], errors='coerce').fillna(0)
+        
         df['acquisition_date'] = pd.to_datetime(df['acquisition_month'])
         df['sales_date'] = pd.to_datetime(df['sales_month'])
         df['cohort_month'] = df['acquisition_date'].dt.to_period('M')
@@ -51,8 +56,9 @@ if uploaded_file is not None:
     def create_pivot(df, metric, max_months):
         cohort_sizes = df.groupby('cohort_month')['new_user_count'].first()
         
+        # Use aggfunc='sum' for both to handle any potential duplicates safely
         if metric == "Retention Rate (%)":
-            pivot_data = df.pivot(index='cohort_month', columns='relative_month', values='active_users')
+            pivot_data = df.pivot_table(index='cohort_month', columns='relative_month', values='active_users', aggfunc='sum')
             # Fill NaN with 0 for missing months
             pivot_data = pivot_data.fillna(0)
             # Normalize to cohort size
@@ -62,7 +68,7 @@ if uploaded_file is not None:
             fmt = '.1f'
             unit = '%'
         else:
-            pivot_data = df.pivot(index='cohort_month', columns='relative_month', values='total_sales', aggfunc='sum')
+            pivot_data = df.pivot_table(index='cohort_month', columns='relative_month', values='total_sales', aggfunc='sum')
             pivot_data = pivot_data.fillna(0)
             fmt = '.0f'
             unit = '$'
