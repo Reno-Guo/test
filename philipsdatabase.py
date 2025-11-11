@@ -2,7 +2,6 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import create_engine, text
 from urllib.parse import quote_plus
-import os
 from datetime import datetime, timedelta
 import random
 import smtplib
@@ -36,16 +35,16 @@ EMAIL_CONFIG = {
     'sender_email': 'idc_ow@oceanwing.com',
     'sender_password': 'OkTIL1AxudQ2y2tC',
     'log_recipient': 'reno.guo@oceanwing.com',
-    'cc_recipients': ['yana.cao@oceanwing.com']
+    'cc_recipient': ['yana.cao@oceanwing.com']
 }
 
-# 表配置
+# 表配置（移除未使用的icon和color）
 TABLES = {
-    'ASIN_goal_philips': {'name': 'ASIN 目标数据', 'icon': '🎯', 'color': '#FF6B6B'},
-    'ods_category': {'name': '类目数据', 'icon': '📁', 'color': '#4ECDC4'},
-    'ods_asin_philips': {'name': 'ASIN 基础数据', 'icon': '📊', 'color': '#45B7D1'},
-    'SI_keyword_philips': {'name': 'SI 关键词数据', 'icon': '🔑', 'color': '#96CEB4'},
-    'ods_goal_vcp': {'name': 'VCP 目标数据', 'icon': '📈', 'color': '#FFEAA7'}
+    'ASIN_goal_philips': {'name': 'ASIN 目标数据'},
+    'ods_category': {'name': '类目数据'},
+    'ods_asin_philips': {'name': 'ASIN 基础数据'},
+    'SI_keyword_philips': {'name': 'SI 关键词数据'},
+    'ods_goal_vcp': {'name': 'VCP 目标数据'}
 }
 
 # ==================== 自定义样式 ====================
@@ -54,7 +53,7 @@ def apply_custom_styles():
     <style>
         /* 全局样式 */
         .stApp {{
-            background: #ffffff;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8f0f8 100%);
         }}
         
         /* 主标题 */
@@ -76,14 +75,7 @@ def apply_custom_styles():
             font-weight: 400;
         }}
         
-        /* 主容器 - 紧凑布局 */
-        .main-container {{
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 0 1rem;
-        }}
-        
-        /* 分组标题 - 更轻量 */
+        /* 分组标题 */
         .section-title {{
             color: {BRAND_COLOR};
             font-size: 1.3rem;
@@ -114,62 +106,7 @@ def apply_custom_styles():
             opacity: 0.3;
         }}
         
-        /* 表选择卡片 - 突出显示 */
-        .table-selector-container {{
-            background: white;
-            border-radius: 16px;
-            padding: 2rem;
-            box-shadow: 0 8px 24px rgba(0,166,228,0.15);
-            margin-bottom: 2rem;
-            border: 2px solid {BRAND_COLOR};
-        }}
-        
-        .table-card {{
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin: 0.5rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            border: 2px solid #e0e0e0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }}
-        
-        .table-card:hover {{
-            transform: translateY(-4px);
-            box-shadow: 0 8px 20px rgba(0,166,228,0.2);
-            border-color: {BRAND_COLOR};
-        }}
-        
-        .table-card-selected {{
-            border-color: {BRAND_COLOR};
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-            box-shadow: 0 4px 16px rgba(0,166,228,0.3);
-        }}
-        
-        .table-icon {{
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
-            display: block;
-        }}
-        
-        .table-name {{
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 0.3rem;
-        }}
-        
-        .table-key {{
-            font-size: 0.85rem;
-            color: #666;
-            font-family: 'Courier New', monospace;
-            background: #f5f5f5;
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-        }}
-        
-        /* 验证码卡片 - 保留强调 */
+        /* 验证码卡片 */
         .auth-card {{
             background: white;
             border-radius: 16px;
@@ -180,7 +117,7 @@ def apply_custom_styles():
             border-top: 4px solid {BRAND_COLOR};
         }}
         
-        /* 备份下载卡片 - 保留强调 */
+        /* 备份下载卡片 */
         .backup-card {{
             background: linear-gradient(135deg, #fff5e6 0%, #ffe8cc 100%);
             border-radius: 12px;
@@ -232,13 +169,6 @@ def apply_custom_styles():
         .stTextInput > div > div > input:focus {{
             border-color: {BRAND_COLOR};
             box-shadow: 0 0 0 3px rgba(0,166,228,0.1);
-        }}
-        
-        /* 文件上传器 */
-        .uploadedFile {{
-            border: 2px dashed {BRAND_COLOR};
-            border-radius: 8px;
-            background: #f8fcff;
         }}
         
         /* 选择框 */
@@ -339,25 +269,17 @@ def init_session_state():
         'backup_download_confirmed': False,
         'selected_table': list(TABLES.keys())[0]
     }
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
+    st.session_state.update({k: v for k, v in defaults.items() if k not in st.session_state})
 
 def get_engine():
     """创建数据库连接"""
     password_encoded = quote_plus(DB_CONFIG['password'])
-    connection_string = (
-        f"clickhouse://{DB_CONFIG['username']}:{password_encoded}@"
-        f"{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
-    )
+    connection_string = f"clickhouse://{DB_CONFIG['username']}:{password_encoded}@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
     return create_engine(connection_string)
 
 def table_exists(engine, table_name, database):
     """检查表是否存在"""
-    query = text(
-        f"SELECT * FROM system.tables WHERE name = '{table_name}' "
-        f"AND database = '{database}' LIMIT 1"
-    )
+    query = text(f"SELECT * FROM system.tables WHERE name = '{table_name}' AND database = '{database}' LIMIT 1")
     with engine.connect() as conn:
         result = pd.read_sql(query, conn)
     return not result.empty
@@ -365,19 +287,13 @@ def table_exists(engine, table_name, database):
 def test_insert_permission(engine, table_name, database):
     """测试INSERT权限 - 动态获取表结构"""
     try:
-        # 获取表的列信息(列名和类型)
-        query = text(
-            f"SELECT name, type FROM system.columns "
-            f"WHERE table = '{table_name}' AND database = '{database}' "
-            f"ORDER BY position LIMIT 5"  # 只取前5列测试即可
-        )
+        query = text(f"SELECT name, type FROM system.columns WHERE table = '{table_name}' AND database = '{database}' ORDER BY position LIMIT 5")
         with engine.connect() as conn:
             columns_info = pd.read_sql(query, conn)
         
         if columns_info.empty:
             return False
         
-        # 构建测试数据
         test_values = []
         test_columns = []
         cleanup_condition = None
@@ -387,46 +303,32 @@ def test_insert_permission(engine, table_name, database):
             col_type = row['type'].lower()
             test_columns.append(col_name)
             
-            # 根据数据类型生成测试值
             if 'int' in col_type or 'float' in col_type or 'decimal' in col_type:
                 test_values.append('0')
             elif 'date' in col_type or 'time' in col_type:
                 test_values.append("'1970-01-01'")
-            else:  # 字符串类型
+            else:
                 test_values.append("'__PERM_TEST__'")
-                if cleanup_condition is None:  # 用第一个字符串列做清理条件
+                if cleanup_condition is None:
                     cleanup_condition = f"{col_name} = '__PERM_TEST__'"
         
-        # 如果没有字符串列,用第一列做清理条件
         if cleanup_condition is None:
             cleanup_condition = f"{test_columns[0]} = {test_values[0]}"
         
-        # 执行测试插入
         with engine.connect() as conn:
-            insert_sql = text(
-                f"INSERT INTO {table_name} ({', '.join(test_columns)}) "
-                f"VALUES ({', '.join(test_values)})"
-            )
+            insert_sql = text(f"INSERT INTO {table_name} ({', '.join(test_columns)}) VALUES ({', '.join(test_values)})")
             conn.execute(insert_sql)
-            
-            # 清理测试数据
             cleanup_sql = text(f"DELETE FROM {table_name} WHERE {cleanup_condition}")
             conn.execute(cleanup_sql)
             
         return True
-        
-    except Exception as e:
-        # 可以选择打印错误信息用于调试
-        # st.warning(f'权限测试失败: {str(e)}')
+    except Exception:
         return False
 
 def get_table_columns(engine, table_name, database):
     """获取数据库表的列名"""
     try:
-        query = text(
-            f"SELECT name FROM system.columns WHERE table = '{table_name}' "
-            f"AND database = '{database}' ORDER BY position"
-        )
+        query = text(f"SELECT name FROM system.columns WHERE table = '{table_name}' AND database = '{database}' ORDER BY position")
         with engine.connect() as conn:
             result = pd.read_sql(query, conn)
         return result['name'].tolist() if not result.empty else []
@@ -436,69 +338,47 @@ def get_table_columns(engine, table_name, database):
 
 def clean_data(df, table_name=None, database=None):
     """数据清洗 - 根据数据库表结构动态处理"""
-    # 1. 清理列名空格
     df.columns = [col.strip() for col in df.columns]
     
-    # 2. 如果提供了表名,根据数据库表结构清洗
     if table_name and database:
         try:
             engine = get_engine()
-            query = text(
-                f"SELECT name, type FROM system.columns "
-                f"WHERE table = '{table_name}' AND database = '{database}'"
-            )
+            query = text(f"SELECT name, type FROM system.columns WHERE table = '{table_name}' AND database = '{database}'")
             with engine.connect() as conn:
                 columns_info = pd.read_sql(query, conn)
             
-            # 创建列名到类型的映射
             col_type_map = dict(zip(columns_info['name'], columns_info['type']))
             
-            # 根据数据库类型处理每一列
             for col in df.columns:
                 if col not in col_type_map:
                     continue
                 
                 db_type = col_type_map[col].lower()
                 
-                # 数值类型
                 if any(t in db_type for t in ['int', 'float', 'decimal', 'double']):
                     df[col] = pd.to_numeric(df[col], errors='coerce')
-                
-                # 日期时间类型
                 elif any(t in db_type for t in ['date', 'datetime', 'timestamp']):
                     df[col] = pd.to_datetime(df[col], errors='coerce')
-                
-                # 字符串类型
                 elif any(t in db_type for t in ['string', 'char', 'varchar', 'text']):
-                    df[col] = df[col].astype(str).str.strip()
-                    # 处理 NaN 值
-                    df[col] = df[col].replace('nan', '')
-                
+                    df[col] = df[col].astype(str).str.strip().replace('nan', '')
         except Exception as e:
             st.warning(f'⚠️ 无法获取表结构进行智能清洗,使用基础清洗: {str(e)}')
-            # 降级到基础清洗
             df = basic_clean_data(df)
     else:
-        # 没有提供表名,使用基础清洗
         df = basic_clean_data(df)
     
     return df
-
 
 def basic_clean_data(df):
     """基础数据清洗 - 不依赖数据库结构"""
     df.columns = [col.strip() for col in df.columns]
     
-    # 尝试自动识别数值列
     for col in df.columns:
-        # 尝试转换为数值,如果超过50%的值能成功转换,就认为是数值列
         try:
             numeric_series = pd.to_numeric(df[col], errors='coerce')
-            valid_ratio = numeric_series.notna().sum() / len(df)
-            if valid_ratio > 0.5:
+            if numeric_series.notna().mean() > 0.5:
                 df[col] = numeric_series
             else:
-                # 字符串列
                 df[col] = df[col].astype(str).str.strip()
         except:
             df[col] = df[col].astype(str).str.strip()
@@ -529,11 +409,7 @@ def send_email_code(to_email, code):
     """发送验证码邮件"""
     beijing_time = datetime.now(BEIJING_TZ)
     subject = 'semanticdb_haiyi数据库操作程序验证码'
-    body = (
-        f'您的验证码是: {code}\n'
-        f'有效期: 5 分钟\n\n'
-        f'发送时间: {beijing_time.strftime("%Y-%m-%d %H:%M:%S")} (北京时间)'
-    )
+    body = f'您的验证码是: {code}\n有效期: 5 分钟\n\n发送时间: {beijing_time.strftime("%Y-%m-%d %H:%M:%S")} (北京时间)'
     return send_email(to_email, subject, body)
 
 def generate_code():
@@ -541,77 +417,49 @@ def generate_code():
     return ''.join(random.choices('0123456789', k=6))
 
 # ==================== 导出功能 ====================
-def export_columns(table_name):
-    """导出空表模板"""
+def export_table(table_name, mode='full', filename=None):
+    """通用导出函数：支持全表/备份（CSV）或模板（XLSX）"""
     try:
         engine = get_engine()
         if not table_exists(engine, table_name, DB_CONFIG['database']):
             return None, f'表 {table_name} 不存在。'
         
-        query = text(
-            f"SELECT name FROM system.columns WHERE table = '{table_name}' "
-            f"AND database = '{DB_CONFIG['database']}' ORDER BY position"
-        )
-        with engine.connect() as conn:
-            df_columns = pd.read_sql(query, conn)
+        if mode == 'columns':
+            query = text(f"SELECT name FROM system.columns WHERE table = '{table_name}' AND database = '{DB_CONFIG['database']}' ORDER BY position")
+            with engine.connect() as conn:
+                df_columns = pd.read_sql(query, conn)
+            
+            if df_columns.empty:
+                return None, '未找到列信息。'
+            
+            column_names = df_columns['name'].tolist()
+            df = pd.DataFrame(columns=column_names)
+            output_buffer = io.BytesIO()
+            with pd.ExcelWriter(output_buffer, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False)
+            output_buffer.seek(0)
+            return output_buffer, f'{table_name}_template.xlsx', None, None
         
-        if df_columns.empty:
-            return None, '未找到列信息。'
-        
-        column_names = df_columns['name'].tolist()
-        empty_df = pd.DataFrame(columns=column_names)
-        
-        output_buffer = io.BytesIO()
-        with pd.ExcelWriter(output_buffer, engine='openpyxl') as writer:
-            empty_df.to_excel(writer, index=False)
-        output_buffer.seek(0)
-        return output_buffer, None
-    except Exception as e:
-        return None, f'导出失败: {str(e)}\n\n提示:确保安装 openpyxl'
-
-def export_full_table(table_name):
-    """下载全表数据"""
-    try:
-        engine = get_engine()
-        if not table_exists(engine, table_name, DB_CONFIG['database']):
-            return None, f'表 {table_name} 不存在。'
-        
+        # 全表或备份模式
         query = text(f"SELECT * FROM {table_name}")
         with engine.connect() as conn:
             df = pd.read_sql(query, conn)
         
         if df.empty:
-            return None, '表为空,无数据导出。'
+            return None, None, None, '表为空,无数据导出。'
         
-        output_buffer = io.BytesIO()
-        df.to_csv(output_buffer, index=False, encoding='utf-8')
-        output_buffer.seek(0)
-        return output_buffer, None
-    except Exception as e:
-        return None, f'导出失败: {str(e)}'
-
-def backup_table_before_upload(table_name):
-    """自动备份全表"""
-    try:
-        engine = get_engine()
-        if not table_exists(engine, table_name, DB_CONFIG['database']):
-            return False, f'表 {table_name} 不存在。'
-        
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_filename = f'{table_name}_backup_{timestamp}.csv'
-        
-        query = text(f"SELECT * FROM {table_name}")
-        with engine.connect() as conn:
-            df = pd.read_sql(query, conn)
+        if not filename:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f'{table_name}_backup_{timestamp}.csv' if mode == 'backup' else f'{table_name}_full_data.csv'
         
         output_buffer = io.BytesIO()
         df.to_csv(output_buffer, index=False, encoding='utf-8')
         output_buffer.seek(0)
         
-        row_count_msg = f",包含 {len(df)} 行数据" if not df.empty else "(表为空)"
-        return True, (output_buffer, backup_filename, row_count_msg)
+        row_msg = f",包含 {len(df)} 行数据" if not df.empty else "(表为空)"
+        return output_buffer, filename, row_msg, None
     except Exception as e:
-        return False, f'备份失败: {str(e)}'
+        return None, None, None, f'导出失败: {str(e)}'
 
 # ==================== 上传功能 ====================
 def perform_upload(table_name, upload_mode, df, uploaded_file, backup_filename):
@@ -639,7 +487,6 @@ def perform_upload(table_name, upload_mode, df, uploaded_file, backup_filename):
             
             df.to_sql(table_name, engine, if_exists='append', index=False)
         
-        # 发送操作日志邮件
         beijing_time = datetime.now(BEIJING_TZ)
         operation_type = '覆盖 (Replace)' if upload_mode == 'replace' else '续表 (Append)'
         row_count = len(df)
@@ -656,8 +503,7 @@ def perform_upload(table_name, upload_mode, df, uploaded_file, backup_filename):
 操作说明: 数据已成功{"清空并" if upload_mode == "replace" else ""}上传到 ClickHouse 数据库。
 如有疑问,请联系管理员。"""
         
-        if send_email(EMAIL_CONFIG['log_recipient'], log_subject, log_body, 
-                     cc_emails=EMAIL_CONFIG['cc_recipients']):
+        if send_email(EMAIL_CONFIG['log_recipient'], log_subject, log_body, EMAIL_CONFIG['cc_recipient']):
             st.info('📧 操作日志已发送到指定邮箱。')
         else:
             st.warning('⚠️ 上传成功,但日志邮件发送失败。')
@@ -668,75 +514,48 @@ def perform_upload(table_name, upload_mode, df, uploaded_file, backup_filename):
         return f'上传失败: {str(e)}\n\n提示:检查权限或重建表后重试。'
 
 def read_csv_with_encoding(uploaded_file):
-    """使用chardet自动检测编码并读取CSV - 智能版本"""
+    """使用chardet自动检测编码并读取CSV"""
     uploaded_file.seek(0)
     
     try:
-        # 方法1: 使用chardet自动检测
-        # 读取足够多的字节用于检测（建议至少10KB）
-        raw_data = uploaded_file.read(min(100000, uploaded_file.size))  # 读取前100KB或全部
-        uploaded_file.seek(0)  # 重置指针
-        
-        # 检测编码
+        raw_data = uploaded_file.read(min(100000, uploaded_file.size))
+        uploaded_file.seek(0)
         detected = chardet.detect(raw_data)
         encoding = detected['encoding']
         confidence = detected['confidence']
         
-        if encoding and confidence > 0.7:  # 置信度大于70%
+        if encoding and confidence > 0.7:
             try:
-                df = pd.read_csv(
-                    uploaded_file, 
-                    encoding=encoding,
-                    na_values=['', 'NA', 'N/A', 'NULL', 'null', 'None', '#N/A', 'nan', 'NaN'],
-                    keep_default_na=True,
-                    skip_blank_lines=True
-                )
-                
-                # 显示检测结果
+                df = pd.read_csv(uploaded_file, encoding=encoding, na_values=['', 'NA', 'N/A', 'NULL', 'null', 'None', '#N/A', 'nan', 'NaN'],
+                                 keep_default_na=True, skip_blank_lines=True)
                 if encoding.lower() in ['utf-8', 'ascii']:
                     st.success(f'✅ 文件编码: **{encoding.upper()}** (置信度: {confidence:.0%})')
                 else:
                     st.info(f'ℹ️ 检测到文件编码: **{encoding.upper()}** (置信度: {confidence:.0%}),已自动转换')
-                
                 return df
-                
             except Exception as e:
                 st.warning(f'⚠️ 使用检测到的编码 {encoding} 读取失败: {str(e)},尝试常用编码...')
         else:
             st.warning(f'⚠️ 编码检测置信度较低({confidence:.0%}),尝试常用编码...')
-        
     except Exception as e:
         st.warning(f'⚠️ 自动检测编码失败: {str(e)},尝试常用编码...')
     
-    # 方法2: 降级到手动尝试常用编码
     uploaded_file.seek(0)
-    common_encodings = [
-        'utf-8', 'utf-8-sig', 'gbk', 'gb2312', 'gb18030', 
-        'big5', 'shift_jis', 'euc_kr', 'iso-8859-1', 'cp1252', 'latin1'
-    ]
+    common_encodings = ['utf-8', 'utf-8-sig', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift_jis', 'euc_kr', 'iso-8859-1', 'cp1252', 'latin1']
     
     for encoding in common_encodings:
         try:
             uploaded_file.seek(0)
-            df = pd.read_csv(
-                uploaded_file, 
-                encoding=encoding,
-                na_values=['', 'NA', 'N/A', 'NULL', 'null', 'None', '#N/A', 'nan', 'NaN'],
-                keep_default_na=True,
-                skip_blank_lines=True
-            )
-            
+            df = pd.read_csv(uploaded_file, encoding=encoding, na_values=['', 'NA', 'N/A', 'NULL', 'null', 'None', '#N/A', 'nan', 'NaN'],
+                             keep_default_na=True, skip_blank_lines=True)
             if encoding != 'utf-8':
                 st.info(f'ℹ️ 使用编码: **{encoding.upper()}**')
-            
             return df
-            
         except (UnicodeDecodeError, UnicodeError):
             continue
         except Exception:
             continue
     
-    # 所有方法都失败
     st.error("""
     ❌ **无法读取CSV文件**
     
@@ -752,86 +571,53 @@ def read_csv_with_encoding(uploaded_file):
     """)
     return None
 
-
 def upload_data(table_name, upload_mode, uploaded_file):
-    """上传数据主函数 - 加强版"""
+    """上传数据主函数"""
     if uploaded_file is None:
         return '请选择文件'
     
-    # 🟢 在函数开始就保存文件名，避免后续指针移动导致的问题
-    original_filename = str(uploaded_file.name)
+    original_filename = uploaded_file.name
     file_lower = original_filename.lower()
-    
     st.info(f'📄 正在处理文件: **{original_filename}**')
     
     try:
         df = None
         
-        # 🟢 使用更明确的判断条件
         if file_lower.endswith('.csv'):
             st.info('📝 识别为 CSV 文件，正在检测编码...')
             df = read_csv_with_encoding(uploaded_file)
-            
             if df is None:
-                return (
-                    '❌ 无法读取CSV文件\n\n'
-                    '**可能原因:**\n'
-                    '1. 文件编码无法识别\n'
-                    '2. 文件已损坏\n'
-                    '3. 文件格式不正确\n\n'
-                    '**建议操作:**\n'
-                    '- 用Excel打开后另存为 UTF-8 CSV\n'
-                    '- 确认文件是标准CSV格式（逗号分隔）'
-                )
+                return '❌ 无法读取CSV文件\n\n**可能原因:**\n1. 文件编码无法识别\n2. 文件已损坏\n3. 文件格式不正确\n\n**建议操作:**\n- 用Excel打开后另存为 UTF-8 CSV\n- 确认文件是标准CSV格式（逗号分隔）'
         
-        elif file_lower.endswith('.xlsx') or file_lower.endswith('.xls'):
+        elif file_lower.endswith(('.xlsx', '.xls')):
             st.info('📊 识别为 Excel 文件，正在读取...')
             try:
                 df = pd.read_excel(uploaded_file)
-            except Exception as excel_error:
-                return f'❌ 读取Excel文件失败: {str(excel_error)}\n\n请确认文件未损坏，或尝试另存为CSV格式。'
+            except Exception as e:
+                return f'❌ 读取Excel文件失败: {str(e)}\n\n请确认文件未损坏，或尝试另存为CSV格式。'
         
         else:
-            # 提取文件扩展名
             extension = original_filename.split('.')[-1] if '.' in original_filename else '无扩展名'
-            return (
-                f'❌ 不支持的文件格式\n\n'
-                f'**文件信息:**\n'
-                f'- 文件名: {original_filename}\n'
-                f'- 扩展名: .{extension}\n\n'
-                f'**支持的格式:**\n'
-                f'- .csv (推荐)\n'
-                f'- .xlsx\n'
-                f'- .xls\n\n'
-                f'请转换文件格式后重新上传。'
-            )
+            return f'❌ 不支持的文件格式\n\n**文件信息:**\n- 文件名: {original_filename}\n- 扩展名: .{extension}\n\n**支持的格式:**\n- .csv (推荐)\n- .xlsx\n- .xls\n\n请转换文件格式后重新上传。'
         
-        # 🟢 验证DataFrame
         if df is None:
             return '❌ 文件读取失败，返回空数据'
         
         if df.empty:
             return '❌ 文件内容为空，没有数据行'
         
-        # 显示读取成功信息
-        st.success(f'✅ 文件读取成功！')
-        st.info(f'📊 数据维度: **{len(df)}** 行 × **{len(df.columns)}** 列')
+        st.success(f'✅ 文件读取成功！数据维度: **{len(df)}** 行 × **{len(df.columns)}** 列')
         
-        # 显示前几列的列名
         preview_cols = df.columns.tolist()[:5]
-        if len(df.columns) > 5:
-            st.info(f'📋 列名预览: {", ".join(preview_cols)} ... (共{len(df.columns)}列)')
-        else:
-            st.info(f'📋 列名: {", ".join(preview_cols)}')
+        preview = f'{", ".join(preview_cols)} ... (共{len(df.columns)}列)' if len(df.columns) > 5 else ", ".join(preview_cols)
+        st.info(f'📋 列名预览: {preview}')
         
-        # 清洗数据
         st.info('🧹 正在清洗数据...')
         df = clean_data(df, table_name, DB_CONFIG['database'])
         
         if df.empty:
             return '❌ 数据清洗后为空，可能所有数据都是无效的'
         
-        # 验证表结构
         st.info('🔍 正在验证表结构...')
         engine = get_engine()
         db_columns = get_table_columns(engine, table_name, DB_CONFIG['database'])
@@ -839,40 +625,28 @@ def upload_data(table_name, upload_mode, uploaded_file):
         if not db_columns:
             return f'❌ 无法获取表 {table_name} 的结构信息\n\n请检查:\n1. 表是否存在\n2. 数据库连接是否正常\n3. 是否有查询权限'
         
-        # 检查列名匹配
         file_columns = df.columns.tolist()
         invalid_cols = [col for col in file_columns if col not in db_columns]
         
         if invalid_cols:
-            return (
-                f'❌ 表头验证失败\n\n'
-                f'**文件中存在数据库表不包含的列:**\n'
-                f'{", ".join(invalid_cols)}\n\n'
-                f'**数据库表 [{table_name}] 的所有列:**\n'
-                f'{", ".join(db_columns)}\n\n'
-                f'**请执行以下操作之一:**\n'
-                f'1. 删除文件中的无效列\n'
-                f'2. 修改列名使其匹配数据库表\n'
-                f'3. 在数据库中添加缺失的列'
-            )
+            return f'❌ 表头验证失败\n\n**文件中存在数据库表不包含的列:**\n{", ".join(invalid_cols)}\n\n**数据库表 [{table_name}] 的所有列:**\n{", ".join(db_columns)}\n\n**请执行以下操作之一:**\n1. 删除文件中的无效列\n2. 修改列名使其匹配数据库表\n3. 在数据库中添加缺失的列'
         
-        st.success(f'✅ 表头验证通过！')
-        st.info(f'📊 文件列: {len(file_columns)} 个 | 数据库列: {len(db_columns)} 个')
+        st.success(f'✅ 表头验证通过！文件列: {len(file_columns)} 个 | 数据库列: {len(db_columns)} 个')
         
-        # 保存到session state
         st.session_state.current_df = df
         st.session_state.current_table = table_name
         st.session_state.current_mode = upload_mode
         st.session_state.current_uploaded_file = uploaded_file
         
-        # 生成备份
         if not st.session_state.backup_generated:
             st.info('💾 正在生成备份...')
-            success, backup_info = backup_table_before_upload(table_name)
-            if not success:
-                return f'❌ 备份失败: {backup_info}'
+            buffer, filename, row_msg, error = export_table(table_name, mode='backup')
+            if error:
+                return f'❌ 备份失败: {error}'
             
-            st.session_state.backup_buffer, st.session_state.backup_filename, st.session_state.backup_row_msg = backup_info
+            st.session_state.backup_buffer = buffer
+            st.session_state.backup_filename = filename
+            st.session_state.backup_row_msg = row_msg
             st.session_state.backup_generated = True
             st.success('✅ 备份已生成')
         
@@ -880,18 +654,18 @@ def upload_data(table_name, upload_mode, uploaded_file):
     
     except Exception as e:
         st.session_state.backup_generated = False
-        
-        # 详细的错误信息
         import traceback
-        error_detail = traceback.format_exc()
-        
         st.error('💥 发生错误')
         with st.expander('🔍 查看详细错误信息', expanded=True):
-            st.code(error_detail)
-        
+            st.code(traceback.format_exc())
         return f'❌ 上传失败: {str(e)}\n\n点击上方展开查看详细错误信息'
 
 # ==================== UI组件 ====================
+def render_divider(thick=False):
+    """复用分割线"""
+    cls = "divider-thick" if thick else "divider"
+    st.markdown(f'<div class="{cls}"></div>', unsafe_allow_html=True)
+
 def render_table_selector():
     """渲染表选择器"""
     st.markdown('<div class="section-title"><span class="icon">📊</span>选择数据表</div>', unsafe_allow_html=True)
@@ -899,21 +673,15 @@ def render_table_selector():
     table_options = list(TABLES.keys())
     current_index = table_options.index(st.session_state.selected_table) if st.session_state.selected_table in table_options else 0
     
-    selected_table = st.selectbox(
-        '选择要操作的数据表:',
-        options=table_options,
-        index=current_index,
-        key='table_selector'
-    )
+    selected_table = st.selectbox('选择要操作的数据表:', options=table_options, index=current_index, key='table_selector')
     
     if selected_table != st.session_state.selected_table:
         st.session_state.selected_table = selected_table
         st.rerun()
     
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-    
+    render_divider()
     return selected_table
-    
+
 def render_captcha_ui():
     """渲染验证码界面"""
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -936,8 +704,7 @@ def render_captcha_ui():
                         st.success(f'✅ 验证码已发送到 {to_email}')
                         st.rerun()
         else:
-            user_input = st.text_input('🔢 输入验证码:', max_chars=6, 
-                                      placeholder='请输入6位数字验证码')
+            user_input = st.text_input('🔢 输入验证码:', max_chars=6, placeholder='请输入6位数字验证码')
             
             col_a, col_b = st.columns(2)
             with col_a:
@@ -968,7 +735,6 @@ def render_captcha_ui():
 
 def render_main_ui():
     """渲染主界面"""
-    # 表选择区域
     table_name = render_table_selector()
 
     with st.expander("📋 查看当前表结构", expanded=False):
@@ -976,79 +742,54 @@ def render_main_ui():
         db_columns = get_table_columns(engine, table_name, DB_CONFIG['database'])
         if db_columns:
             st.info(f"表 **{table_name}** 包含 {len(db_columns)} 个字段:")
-            # 分3列显示
             cols = st.columns(3)
             for idx, col in enumerate(db_columns):
                 cols[idx % 3].markdown(f"• `{col}`")
         else:
             st.warning("无法获取表结构信息")
     
-    # 分割线
-    st.markdown('<div class="divider-thick"></div>', unsafe_allow_html=True)
+    render_divider(thick=True)
     
-    # 导出功能区域
     st.markdown('<div class="section-title"><span class="icon">📥</span>数据导出</div>', unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
     with col1:
         if st.button('📋 导出空表模板', use_container_width=True):
             with st.spinner('正在生成模板...'):
-                buffer, error = export_columns(table_name)
+                buffer, filename, _, error = export_table(table_name, mode='columns')
                 if error:
                     st.error(f'❌ {error}')
                 else:
-                    st.download_button(
-                        label='⬇️ 下载空表模板 (XLSX)',
-                        data=buffer,
-                        file_name=f'{table_name}_template.xlsx',
-                        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                        use_container_width=True
-                    )
+                    st.download_button(label='⬇️ 下载空表模板 (XLSX)', data=buffer, file_name=filename,
+                                       mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', use_container_width=True)
     
     with col2:
         if st.button('📦 下载全表数据', use_container_width=True):
             with st.spinner('正在导出数据...'):
-                buffer, error = export_full_table(table_name)
+                buffer, filename, _, error = export_table(table_name, mode='full')
                 if error:
                     st.error(f'❌ {error}')
                 else:
-                    st.download_button(
-                        label='⬇️ 下载全表数据 (CSV)',
-                        data=buffer,
-                        file_name=f'{table_name}_full_data.csv',
-                        mime='text/csv',
-                        use_container_width=True
-                    )
+                    st.download_button(label='⬇️ 下载全表数据 (CSV)', data=buffer, file_name=filename, mime='text/csv', use_container_width=True)
     
-    # 分割线
-    st.markdown('<div class="divider-thick"></div>', unsafe_allow_html=True)
+    render_divider(thick=True)
     
-    # 上传功能区域
     st.markdown('<div class="section-title"><span class="icon">📤</span>数据上传</div>', unsafe_allow_html=True)
     
     st.markdown('**步骤 1: 选择上传方式**')
-    upload_mode = st.radio(
-        '上传方式:',
-        ('🔄 覆盖模式 (Replace) - 清空表后上传', '➕ 续表模式 (Append) - 追加到现有数据'),
-        horizontal=False,
-        label_visibility="collapsed"
-    )
+    upload_mode = st.radio('上传方式:', ('🔄 覆盖模式 (Replace) - 清空表后上传', '➕ 续表模式 (Append) - 追加到现有数据'),
+                           horizontal=False, label_visibility="collapsed")
     upload_mode = 'replace' if '覆盖' in upload_mode else 'append'
     
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+    render_divider()
     
     st.markdown('**步骤 2: 选择文件**')
-    uploaded_file = st.file_uploader(
-        '选择 CSV 或 XLSX 文件',
-        type=['csv', 'xlsx'],
-        help='支持 CSV 和 XLSX 格式的文件',
-        label_visibility="collapsed"
-    )
+    uploaded_file = st.file_uploader('选择 CSV 或 XLSX 文件', type=['csv', 'xlsx'], help='支持 CSV 和 XLSX 格式的文件', label_visibility="collapsed")
     
     if uploaded_file:
         st.success(f'✅ 已选择文件: **{uploaded_file.name}**')
     
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+    render_divider()
     
     st.markdown('**步骤 3: 开始上传**')
     if st.button('🚀 开始上传数据', type='primary', use_container_width=True):
@@ -1056,15 +797,14 @@ def render_main_ui():
             result = upload_data(table_name, upload_mode, uploaded_file)
             if result == 'backup_ready':
                 st.success('✅ 备份已准备好,请下载后继续。')
-            elif result and '成功' in result:
+            elif '成功' in result:
                 st.success(f'✅ {result}')
                 st.balloons()
-            elif result:
+            else:
                 st.error(f'❌ {result}')
     
-    # 备份下载区域
     if st.session_state.get('backup_generated', False):
-        st.markdown('<div class="divider-thick"></div>', unsafe_allow_html=True)
+        render_divider(thick=True)
         st.markdown('<div class="backup-card">', unsafe_allow_html=True)
         st.markdown('<div class="section-title"><span class="icon">💾</span>备份文件下载</div>', unsafe_allow_html=True)
         
@@ -1073,35 +813,19 @@ def render_main_ui():
         
         col1, col2 = st.columns([2, 1])
         with col1:
-            st.download_button(
-                label=f'💾 下载备份文件: {st.session_state.backup_filename}',
-                data=st.session_state.backup_buffer,
-                file_name=st.session_state.backup_filename,
-                mime='text/csv',
-                use_container_width=True
-            )
+            st.download_button(label=f'💾 下载备份文件: {st.session_state.backup_filename}', data=st.session_state.backup_buffer,
+                               file_name=st.session_state.backup_filename, mime='text/csv', use_container_width=True)
         with col2:
-            st.markdown('<div style="text-align: center; padding-top: 8px;">', unsafe_allow_html=True)
-            st.markdown('<span class="badge badge-warning">必须下载</span>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div style="text-align: center; padding-top: 8px;"><span class="badge badge-warning">必须下载</span></div>', unsafe_allow_html=True)
         
-        st.session_state.backup_download_confirmed = st.checkbox(
-            '✓ 我已下载备份文件',
-            value=st.session_state.backup_download_confirmed
-        )
+        st.session_state.backup_download_confirmed = st.checkbox('✓ 我已下载备份文件', value=st.session_state.backup_download_confirmed)
         
         if st.session_state.backup_download_confirmed:
             if st.button('✅ 继续上传', type='primary', use_container_width=True):
                 with st.spinner('正在上传数据到数据库...'):
-                    result = perform_upload(
-                        st.session_state.current_table,
-                        st.session_state.current_mode,
-                        st.session_state.current_df,
-                        st.session_state.current_uploaded_file,
-                        st.session_state.backup_filename
-                    )
+                    result = perform_upload(st.session_state.current_table, st.session_state.current_mode, st.session_state.current_df,
+                                            st.session_state.current_uploaded_file, st.session_state.backup_filename)
                     
-                    # 重置状态
                     st.session_state.backup_generated = False
                     st.session_state.backup_buffer = None
                     st.session_state.backup_filename = None
@@ -1120,10 +844,8 @@ def render_main_ui():
         
         st.markdown('</div>', unsafe_allow_html=True)
     
-    # 分割线
-    st.markdown('<div class="divider-thick"></div>', unsafe_allow_html=True)
+    render_divider(thick=True)
     
-    # 使用说明
     st.markdown('<div class="section-title"><span class="icon">📖</span>使用说明</div>', unsafe_allow_html=True)
     st.markdown("""
     <div class="info-box">
@@ -1140,24 +862,16 @@ def render_main_ui():
 
 # ==================== 主程序 ====================
 def main():
-    st.set_page_config(
-        page_title="Database Manager",
-        page_icon="📊",
-        layout="wide",
-        initial_sidebar_state="collapsed"
-    )
+    st.set_page_config(page_title="Database Manager", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
     
     apply_custom_styles()
     init_session_state()
     
-    # 标题
     st.markdown('<h1 class="main-title">📊 Database Manager</h1>', unsafe_allow_html=True)
     st.markdown('<p class="main-subtitle">semanticdb_haiyi 数据库管理系统</p>', unsafe_allow_html=True)
     
-    # 轻量分割线
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+    render_divider()
     
-    # 验证码验证
     if not st.session_state.captcha_verified:
         render_captcha_ui()
     else:
