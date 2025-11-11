@@ -713,7 +713,10 @@ def upload_data(table_name, upload_mode, uploaded_file):
     
     try:
         if uploaded_file.name.lower().endswith('.csv'):
-            df = pd.read_csv(uploaded_file)
+            df = read_csv_with_encoding(uploaded_file)  # 🟢 改这里
+        if df is None:  # 🟢 添加错误检查
+            return '❌ 无法读取CSV文件。请检查:\n1. 文件是否损坏\n2. 是否包含特殊字符\n3. 尝试用Excel另存为UTF-8编码的CSV'
+        
         elif uploaded_file.name.lower().endswith('.xlsx'):
             df = pd.read_excel(uploaded_file)
         else:
