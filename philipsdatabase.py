@@ -53,7 +53,7 @@ def apply_custom_styles():
     <style>
         /* 全局样式 */
         .stApp {{
-            background: linear-gradient(135deg, #f5f7fa 0%, #e8f0f8 100%);
+            background: #ffffff;
         }}
         
         /* 主标题 */
@@ -686,7 +686,6 @@ def render_captcha_ui():
     """渲染验证码界面"""
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown('<div class="auth-card">', unsafe_allow_html=True)
         st.markdown(f'<div style="text-align: center; margin-bottom: 1.5rem;"><span style="font-size: 3rem;">🔐</span></div>', unsafe_allow_html=True)
         st.markdown(f'<h2 style="text-align: center; color: {BRAND_COLOR}; margin-bottom: 1rem;">邮件验证码验证</h2>', unsafe_allow_html=True)
         
