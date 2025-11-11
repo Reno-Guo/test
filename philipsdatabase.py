@@ -666,6 +666,46 @@ def perform_upload(table_name, upload_mode, df, uploaded_file, backup_filename):
     except Exception as e:
         return f'上传失败: {str(e)}\n\n提示:检查权限或重建表后重试。'
 
+def read_csv_with_encoding(uploaded_file):
+    """尝试多种编码读取CSV文件"""
+    # 常见的中文编码列表(按优先级排序)
+    encodings = [
+        'utf-8',           # 标准UTF-8
+        'utf-8-sig',       # 带BOM的UTF-8
+        'gbk',             # 简体中文(Windows常用)
+        'gb2312',          # 简体中文(旧标准)
+        'gb18030',         # 简体中文(新标准)
+        'big5',            # 繁体中文
+        'iso-8859-1',      # 西欧编码
+        'cp936',           # 简体中文(Windows代码页)
+        'latin1'           # 拉丁编码
+    ]
+    
+    # 重置文件指针到开头
+    uploaded_file.seek(0)
+    
+    for encoding in encodings:
+        try:
+            uploaded_file.seek(0)  # 每次尝试前重置指针
+            df = pd.read_csv(uploaded_file, encoding=encoding)
+            
+            # 成功读取后提示使用的编码
+            if encoding != 'utf-8':
+                st.info(f'ℹ️ 检测到文件编码为: **{encoding.upper()}**,已自动转换')
+            
+            return df
+            
+        except UnicodeDecodeError:
+            continue  # 编码不对,尝试下一个
+        except Exception as e:
+            # 其他错误(如文件损坏)
+            st.error(f'读取文件时出错({encoding}): {str(e)}')
+            continue
+    
+    # 所有编码都失败
+    st.error('❌ 无法识别文件编码,已尝试的编码: ' + ', '.join(encodings))
+    return None
+
 def upload_data(table_name, upload_mode, uploaded_file):
     """上传数据主函数"""
     if uploaded_file is None:
