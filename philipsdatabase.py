@@ -804,7 +804,6 @@ def render_main_ui():
     
     if st.session_state.get('backup_generated', False):
         render_divider(thick=True)
-        st.markdown('<div class="backup-card">', unsafe_allow_html=True)
         st.markdown('<div class="section-title"><span class="icon">💾</span>备份文件下载</div>', unsafe_allow_html=True)
         
         st.warning(f'⚠️ 备份文件已生成{st.session_state.backup_row_msg}')
