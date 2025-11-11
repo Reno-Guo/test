@@ -10,6 +10,7 @@ from email.mime.text import MIMEText
 from email.header import Header
 import io
 import pytz
+import chardet
 
 # ==================== 配置常量 ====================
 BRAND_COLOR = "#00a6e4"
@@ -667,44 +668,90 @@ def perform_upload(table_name, upload_mode, df, uploaded_file, backup_filename):
         return f'上传失败: {str(e)}\n\n提示:检查权限或重建表后重试。'
 
 def read_csv_with_encoding(uploaded_file):
-    """尝试多种编码读取CSV文件"""
-    # 常见的中文编码列表(按优先级排序)
-    encodings = [
-        'utf-8',           # 标准UTF-8
-        'utf-8-sig',       # 带BOM的UTF-8
-        'gbk',             # 简体中文(Windows常用)
-        'gb2312',          # 简体中文(旧标准)
-        'gb18030',         # 简体中文(新标准)
-        'big5',            # 繁体中文
-        'iso-8859-1',      # 西欧编码
-        'cp936',           # 简体中文(Windows代码页)
-        'latin1'           # 拉丁编码
-    ]
-    
-    # 重置文件指针到开头
+    """使用chardet自动检测编码并读取CSV - 智能版本"""
     uploaded_file.seek(0)
     
-    for encoding in encodings:
+    try:
+        # 方法1: 使用chardet自动检测
+        # 读取足够多的字节用于检测（建议至少10KB）
+        raw_data = uploaded_file.read(min(100000, uploaded_file.size))  # 读取前100KB或全部
+        uploaded_file.seek(0)  # 重置指针
+        
+        # 检测编码
+        detected = chardet.detect(raw_data)
+        encoding = detected['encoding']
+        confidence = detected['confidence']
+        
+        if encoding and confidence > 0.7:  # 置信度大于70%
+            try:
+                df = pd.read_csv(
+                    uploaded_file, 
+                    encoding=encoding,
+                    na_values=['', 'NA', 'N/A', 'NULL', 'null', 'None', '#N/A', 'nan', 'NaN'],
+                    keep_default_na=True,
+                    skip_blank_lines=True
+                )
+                
+                # 显示检测结果
+                if encoding.lower() in ['utf-8', 'ascii']:
+                    st.success(f'✅ 文件编码: **{encoding.upper()}** (置信度: {confidence:.0%})')
+                else:
+                    st.info(f'ℹ️ 检测到文件编码: **{encoding.upper()}** (置信度: {confidence:.0%}),已自动转换')
+                
+                return df
+                
+            except Exception as e:
+                st.warning(f'⚠️ 使用检测到的编码 {encoding} 读取失败: {str(e)},尝试常用编码...')
+        else:
+            st.warning(f'⚠️ 编码检测置信度较低({confidence:.0%}),尝试常用编码...')
+        
+    except Exception as e:
+        st.warning(f'⚠️ 自动检测编码失败: {str(e)},尝试常用编码...')
+    
+    # 方法2: 降级到手动尝试常用编码
+    uploaded_file.seek(0)
+    common_encodings = [
+        'utf-8', 'utf-8-sig', 'gbk', 'gb2312', 'gb18030', 
+        'big5', 'shift_jis', 'euc_kr', 'iso-8859-1', 'cp1252', 'latin1'
+    ]
+    
+    for encoding in common_encodings:
         try:
-            uploaded_file.seek(0)  # 每次尝试前重置指针
-            df = pd.read_csv(uploaded_file, encoding=encoding)
+            uploaded_file.seek(0)
+            df = pd.read_csv(
+                uploaded_file, 
+                encoding=encoding,
+                na_values=['', 'NA', 'N/A', 'NULL', 'null', 'None', '#N/A', 'nan', 'NaN'],
+                keep_default_na=True,
+                skip_blank_lines=True
+            )
             
-            # 成功读取后提示使用的编码
             if encoding != 'utf-8':
-                st.info(f'ℹ️ 检测到文件编码为: **{encoding.upper()}**,已自动转换')
+                st.info(f'ℹ️ 使用编码: **{encoding.upper()}**')
             
             return df
             
-        except UnicodeDecodeError:
-            continue  # 编码不对,尝试下一个
-        except Exception as e:
-            # 其他错误(如文件损坏)
-            st.error(f'读取文件时出错({encoding}): {str(e)}')
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+        except Exception:
             continue
     
-    # 所有编码都失败
-    st.error('❌ 无法识别文件编码,已尝试的编码: ' + ', '.join(encodings))
+    # 所有方法都失败
+    st.error("""
+    ❌ **无法读取CSV文件**
+    
+    **可能原因:**
+    1. 文件编码格式非常罕见
+    2. 文件已损坏
+    3. 文件包含二进制数据
+    
+    **建议操作:**
+    1. 用Excel打开文件,另存为 **UTF-8 CSV** 格式
+    2. 或使用记事本打开,选择 **另存为** → **编码选择UTF-8**
+    3. 确认文件是标准CSV格式（逗号分隔）
+    """)
     return None
+
 
 def upload_data(table_name, upload_mode, uploaded_file):
     """上传数据主函数"""
