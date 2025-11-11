@@ -768,92 +768,27 @@ def upload_data(table_name, upload_mode, uploaded_file):
 
 # ==================== UI组件 ====================
 def render_table_selector():
-    """渲染表选择器 - 可搜索下拉框"""
-    st.markdown('<div class="table-selector-container">', unsafe_allow_html=True)
+    """渲染表选择器"""
+    st.markdown('<div class="section-title"><span class="icon">📊</span>选择数据表</div>', unsafe_allow_html=True)
     
-    col1, col2 = st.columns([3, 1])
+    table_options = list(TABLES.keys())
+    current_index = table_options.index(st.session_state.selected_table) if st.session_state.selected_table in table_options else 0
     
-    with col1:
-        st.markdown('<div class="section-title"><span class="icon">📊</span>选择数据表</div>', unsafe_allow_html=True)
-    
-    with col2:
-        # 显示表总数
-        st.markdown(f"""
-        <div style="text-align: right; padding-top: 0.8rem;">
-            <span class="badge badge-info">共 {len(TABLES)} 张表</span>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # 构建选项列表
-    table_options = []
-    table_mapping = {}
-    
-    for key, info in TABLES.items():
-        display_text = f"{info['icon']} {info['name']}"
-        table_options.append(display_text)
-        table_mapping[display_text] = key
-    
-    # 获取当前选中项
-    current_key = st.session_state.selected_table
-    current_display = f"{TABLES[current_key]['icon']} {TABLES[current_key]['name']}"
-    current_index = table_options.index(current_display)
-    
-    # 下拉框选择
-    selected_display = st.selectbox(
+    selected_table = st.selectbox(
         '选择要操作的数据表:',
         options=table_options,
         index=current_index,
-        key='table_selector',
-        help='支持输入关键词搜索表名',
-        label_visibility='visible'
+        key='table_selector'
     )
     
-    # 更新选中状态
-    selected_table = table_mapping[selected_display]
     if selected_table != st.session_state.selected_table:
         st.session_state.selected_table = selected_table
         st.rerun()
     
-    # 显示详细信息卡片
-    selected_info = TABLES[selected_table]
-    
-    col_a, col_b = st.columns([1, 3])
-    
-    with col_a:
-        st.markdown(f"""
-        <div style="text-align: center; padding: 1.5rem; background: white; 
-                    border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            <div style="font-size: 4rem; margin-bottom: 0.5rem;">{selected_info['icon']}</div>
-            <div style="font-size: 0.85rem; color: #999;">表图标</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col_b:
-        st.markdown(f"""
-        <div style="padding: 1.5rem; background: white; border-radius: 12px; 
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.1); height: 100%;">
-            <div style="margin-bottom: 0.8rem;">
-                <span style="color: #999; font-size: 0.85rem;">表名称</span>
-                <div style="font-size: 1.3rem; font-weight: 600; color: {BRAND_COLOR}; margin-top: 0.2rem;">
-                    {selected_info['name']}
-                </div>
-            </div>
-            <div>
-                <span style="color: #999; font-size: 0.85rem;">数据库表名</span>
-                <div style="margin-top: 0.2rem;">
-                    <code style="background: #f5f5f5; padding: 0.4rem 0.8rem; border-radius: 6px; 
-                                font-size: 0.95rem; color: #333; font-family: 'Courier New', monospace;">
-                        {selected_table}
-                    </code>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
     
     return selected_table
-
+    
 def render_captcha_ui():
     """渲染验证码界面"""
     col1, col2, col3 = st.columns([1, 2, 1])
