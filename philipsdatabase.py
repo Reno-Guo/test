@@ -816,7 +816,6 @@ def render_main_ui():
         with col2:
             st.markdown('<div style="text-align: center; padding-top: 8px;">', unsafe_allow_html=True)
             st.markdown('<span class="badge badge-warning">必须下载</span>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
         
         st.session_state.backup_download_confirmed = st.checkbox('✓ 我已下载备份文件', value=st.session_state.backup_download_confirmed)
         
