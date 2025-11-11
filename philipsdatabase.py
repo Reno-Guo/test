@@ -361,22 +361,6 @@ def table_exists(engine, table_name, database):
         result = pd.read_sql(query, conn)
     return not result.empty
 
-def test_insert_permission(engine, table_name):
-    """测试INSERT权限"""
-    try:
-        with engine.connect() as conn:
-            test_insert = text(
-                f"INSERT INTO {table_name} (Country, SKU, spend_contrbution, "
-                f"Profitable_ROAS, Breakeven_ROAS) VALUES "
-                f"('PERM_TEST', 'PERM_TEST', 0.0, 0.0, 0.0)"
-            )
-            conn.execute(test_insert)
-            cleanup = text(f"DELETE FROM {table_name} WHERE Country = 'PERM_TEST'")
-            conn.execute(cleanup)
-            return True
-    except Exception:
-        return False
-
 def get_table_columns(engine, table_name, database):
     """获取数据库表的列名"""
     try:
@@ -391,18 +375,73 @@ def get_table_columns(engine, table_name, database):
         st.error(f'获取表结构失败: {str(e)}')
         return []
 
-def clean_data(df):
-    """数据清洗"""
+def clean_data(df, table_name=None, database=None):
+    """数据清洗 - 根据数据库表结构动态处理"""
+    # 1. 清理列名空格
     df.columns = [col.strip() for col in df.columns]
     
-    numeric_cols = ['spend_contrbution', 'Profitable_ROAS', 'Breakeven_ROAS']
-    for col in numeric_cols:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
+    # 2. 如果提供了表名,根据数据库表结构清洗
+    if table_name and database:
+        try:
+            engine = get_engine()
+            query = text(
+                f"SELECT name, type FROM system.columns "
+                f"WHERE table = '{table_name}' AND database = '{database}'"
+            )
+            with engine.connect() as conn:
+                columns_info = pd.read_sql(query, conn)
+            
+            # 创建列名到类型的映射
+            col_type_map = dict(zip(columns_info['name'], columns_info['type']))
+            
+            # 根据数据库类型处理每一列
+            for col in df.columns:
+                if col not in col_type_map:
+                    continue
+                
+                db_type = col_type_map[col].lower()
+                
+                # 数值类型
+                if any(t in db_type for t in ['int', 'float', 'decimal', 'double']):
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+                # 日期时间类型
+                elif any(t in db_type for t in ['date', 'datetime', 'timestamp']):
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
+                
+                # 字符串类型
+                elif any(t in db_type for t in ['string', 'char', 'varchar', 'text']):
+                    df[col] = df[col].astype(str).str.strip()
+                    # 处理 NaN 值
+                    df[col] = df[col].replace('nan', '')
+                
+        except Exception as e:
+            st.warning(f'⚠️ 无法获取表结构进行智能清洗,使用基础清洗: {str(e)}')
+            # 降级到基础清洗
+            df = basic_clean_data(df)
+    else:
+        # 没有提供表名,使用基础清洗
+        df = basic_clean_data(df)
     
-    string_cols = ['Country', 'SKU']
-    for col in string_cols:
-        if col in df.columns:
+    return df
+
+
+def basic_clean_data(df):
+    """基础数据清洗 - 不依赖数据库结构"""
+    df.columns = [col.strip() for col in df.columns]
+    
+    # 尝试自动识别数值列
+    for col in df.columns:
+        # 尝试转换为数值,如果超过50%的值能成功转换,就认为是数值列
+        try:
+            numeric_series = pd.to_numeric(df[col], errors='coerce')
+            valid_ratio = numeric_series.notna().sum() / len(df)
+            if valid_ratio > 0.5:
+                df[col] = numeric_series
+            else:
+                # 字符串列
+                df[col] = df[col].astype(str).str.strip()
+        except:
             df[col] = df[col].astype(str).str.strip()
     
     return df
@@ -524,7 +563,7 @@ def perform_upload(table_name, upload_mode, df, uploaded_file, backup_filename):
         if not table_exists(engine, table_name, DB_CONFIG['database']):
             return f'表 {table_name} 不存在。请先重建表。'
         
-        if not test_insert_permission(engine, table_name):
+        if not test_insert_permission(engine, table_name, DB_CONFIG['database']):
             grant_sql = f"GRANT INSERT ON {DB_CONFIG['database']}.{table_name} TO {DB_CONFIG['username']};"
             if upload_mode == 'replace':
                 grant_sql += f"\nGRANT TRUNCATE ON {DB_CONFIG['database']}.{table_name} TO {DB_CONFIG['username']};"
@@ -582,7 +621,7 @@ def upload_data(table_name, upload_mode, uploaded_file):
         else:
             return '不支持的文件格式。请使用 CSV 或 XLSX。'
         
-        df = clean_data(df)
+        df = clean_data(df, table_name, DB_CONFIG['database'])
         
         if df.empty:
             return '文件为空或无有效数据'
