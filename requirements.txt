@@ -9,3 +9,4 @@ plotly>=5.22.0
 sqlalchemy>=2.0.0
 clickhouse-sqlalchemy>=0.2.3
 pytz>=2023.3
+chardet>=5.2.0
