@@ -361,6 +361,64 @@ def table_exists(engine, table_name, database):
         result = pd.read_sql(query, conn)
     return not result.empty
 
+def test_insert_permission(engine, table_name, database):
+    """测试INSERT权限 - 动态获取表结构"""
+    try:
+        # 获取表的列信息(列名和类型)
+        query = text(
+            f"SELECT name, type FROM system.columns "
+            f"WHERE table = '{table_name}' AND database = '{database}' "
+            f"ORDER BY position LIMIT 5"  # 只取前5列测试即可
+        )
+        with engine.connect() as conn:
+            columns_info = pd.read_sql(query, conn)
+        
+        if columns_info.empty:
+            return False
+        
+        # 构建测试数据
+        test_values = []
+        test_columns = []
+        cleanup_condition = None
+        
+        for _, row in columns_info.iterrows():
+            col_name = row['name']
+            col_type = row['type'].lower()
+            test_columns.append(col_name)
+            
+            # 根据数据类型生成测试值
+            if 'int' in col_type or 'float' in col_type or 'decimal' in col_type:
+                test_values.append('0')
+            elif 'date' in col_type or 'time' in col_type:
+                test_values.append("'1970-01-01'")
+            else:  # 字符串类型
+                test_values.append("'__PERM_TEST__'")
+                if cleanup_condition is None:  # 用第一个字符串列做清理条件
+                    cleanup_condition = f"{col_name} = '__PERM_TEST__'"
+        
+        # 如果没有字符串列,用第一列做清理条件
+        if cleanup_condition is None:
+            cleanup_condition = f"{test_columns[0]} = {test_values[0]}"
+        
+        # 执行测试插入
+        with engine.connect() as conn:
+            insert_sql = text(
+                f"INSERT INTO {table_name} ({', '.join(test_columns)}) "
+                f"VALUES ({', '.join(test_values)})"
+            )
+            conn.execute(insert_sql)
+            
+            # 清理测试数据
+            cleanup_sql = text(f"DELETE FROM {table_name} WHERE {cleanup_condition}")
+            conn.execute(cleanup_sql)
+            
+        return True
+        
+    except Exception as e:
+        # 可以选择打印错误信息用于调试
+        # st.warning(f'权限测试失败: {str(e)}')
+        return False
+
 def get_table_columns(engine, table_name, database):
     """获取数据库表的列名"""
     try:
