@@ -814,7 +814,7 @@ def render_main_ui():
             st.download_button(label=f'💾 下载备份文件: {st.session_state.backup_filename}', data=st.session_state.backup_buffer,
                                file_name=st.session_state.backup_filename, mime='text/csv', use_container_width=True)
         with col2:
-            st.markdown('<div style="text-align: center; padding-top: 8px;background-color: #ff4444;"><span class="badge badge-warning">必须下载</span></div>', unsafe_allow_html=True)
+            st.markdown('<div style="text-align: center; padding-top: 8px;"><span class="badge badge-warning">必须下载</span></div>', unsafe_allow_html=True)
         
         st.session_state.backup_download_confirmed = st.checkbox('✓ 我已下载备份文件', value=st.session_state.backup_download_confirmed)
         
