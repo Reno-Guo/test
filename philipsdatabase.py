@@ -47,8 +47,6 @@ TABLES = {
     'ods_goal_vcp': {'name': 'VCP 目标数据', 'icon': '📈', 'color': '#FFEAA7'}
 }
 
-EXPECTED_COLUMNS = ['Country', 'SKU', 'spend_contrbution', 'Profitable_ROAS', 'Breakeven_ROAS']
-
 # ==================== 自定义样式 ====================
 def apply_custom_styles():
     st.markdown(f"""
@@ -379,6 +377,20 @@ def test_insert_permission(engine, table_name):
     except Exception:
         return False
 
+def get_table_columns(engine, table_name, database):
+    """获取数据库表的列名"""
+    try:
+        query = text(
+            f"SELECT name FROM system.columns WHERE table = '{table_name}' "
+            f"AND database = '{database}' ORDER BY position"
+        )
+        with engine.connect() as conn:
+            result = pd.read_sql(query, conn)
+        return result['name'].tolist() if not result.empty else []
+    except Exception as e:
+        st.error(f'获取表结构失败: {str(e)}')
+        return []
+
 def clean_data(df):
     """数据清洗"""
     df.columns = [col.strip() for col in df.columns]
@@ -575,10 +587,29 @@ def upload_data(table_name, upload_mode, uploaded_file):
         if df.empty:
             return '文件为空或无有效数据'
         
-        missing_cols = [col for col in EXPECTED_COLUMNS if col not in df.columns]
-        if missing_cols:
-            return f'文件缺少必要列: {", ".join(missing_cols)}。\n请确保文件列名为: {", ".join(EXPECTED_COLUMNS)}'
+        # 🟢 改为动态获取数据库表结构并验证:
+        engine = get_engine()
+        db_columns = get_table_columns(engine, table_name, DB_CONFIG['database'])
         
+        if not db_columns:
+            return f'无法获取表 {table_name} 的结构信息'
+        
+        # 检查上传文件的列是否都在数据库表中
+        file_columns = df.columns.tolist()
+        invalid_cols = [col for col in file_columns if col not in db_columns]
+        
+        if invalid_cols:
+            return (
+                f'❌ 文件包含数据库表中不存在的列:\n'
+                f'无效列: {", ".join(invalid_cols)}\n\n'
+                f'数据库表 [{table_name}] 的有效列:\n'
+                f'{", ".join(db_columns)}\n\n'
+                f'请修改文件,确保所有列名都在数据库表中。'
+            )
+        
+        st.info(f'✅ 表头验证通过! 文件列数: {len(file_columns)}, 数据库列数: {len(db_columns)}')
+        
+        # 继续原有逻辑...
         st.session_state.current_df = df
         st.session_state.current_table = table_name
         st.session_state.current_mode = upload_mode
@@ -689,6 +720,18 @@ def render_main_ui():
     """渲染主界面"""
     # 表选择区域
     table_name = render_table_selector()
+
+    with st.expander("📋 查看当前表结构", expanded=False):
+        engine = get_engine()
+        db_columns = get_table_columns(engine, table_name, DB_CONFIG['database'])
+        if db_columns:
+            st.info(f"表 **{table_name}** 包含 {len(db_columns)} 个字段:")
+            # 分3列显示
+            cols = st.columns(3)
+            for idx, col in enumerate(db_columns):
+                cols[idx % 3].markdown(f"• `{col}`")
+        else:
+            st.warning("无法获取表结构信息")
     
     # 分割线
     st.markdown('<div class="divider-thick"></div>', unsafe_allow_html=True)
