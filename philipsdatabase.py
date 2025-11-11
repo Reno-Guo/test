@@ -811,13 +811,8 @@ def render_main_ui():
         
         col1, col2 = st.columns([2, 1])
         with col1:
-            st.download_button(
-                label=f'💾 下载备份文件: {st.session_state.backup_filename}',
-                data=st.session_state.backup_buffer,
-                file_name=st.session_state.backup_filename,
-                mime='text/csv',
-                use_container_width=True
-            )
+            st.download_button(label=f'💾 下载备份文件: {st.session_state.backup_filename}', data=st.session_state.backup_buffer,
+                               file_name=st.session_state.backup_filename, mime='text/csv', use_container_width=True)
         with col2:
             st.markdown('<div style="text-align: center; padding-top: 8px;">', unsafe_allow_html=True)
             st.markdown('<span class="badge badge-warning">必须下载</span>', unsafe_allow_html=True)
