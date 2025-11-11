@@ -54,7 +54,7 @@ def apply_custom_styles():
     <style>
         /* 全局样式 */
         .stApp {{
-            background: linear-gradient(135deg, #f5f7fa 0%, #e8f0f8 100%);
+            background: #ffffff;
         }}
         
         /* 主标题 */
