@@ -754,67 +754,142 @@ def read_csv_with_encoding(uploaded_file):
 
 
 def upload_data(table_name, upload_mode, uploaded_file):
-    """上传数据主函数"""
+    """上传数据主函数 - 加强版"""
     if uploaded_file is None:
         return '请选择文件'
     
+    # 🟢 在函数开始就保存文件名，避免后续指针移动导致的问题
+    original_filename = str(uploaded_file.name)
+    file_lower = original_filename.lower()
+    
+    st.info(f'📄 正在处理文件: **{original_filename}**')
+    
     try:
-        if uploaded_file.name.lower().endswith('.csv'):
-            df = read_csv_with_encoding(uploaded_file)  # 🟢 改这里
-        if df is None:  # 🟢 添加错误检查
-            return '❌ 无法读取CSV文件。请检查:\n1. 文件是否损坏\n2. 是否包含特殊字符\n3. 尝试用Excel另存为UTF-8编码的CSV'
+        df = None
         
-        elif uploaded_file.name.lower().endswith('.xlsx'):
-            df = pd.read_excel(uploaded_file)
+        # 🟢 使用更明确的判断条件
+        if file_lower.endswith('.csv'):
+            st.info('📝 识别为 CSV 文件，正在检测编码...')
+            df = read_csv_with_encoding(uploaded_file)
+            
+            if df is None:
+                return (
+                    '❌ 无法读取CSV文件\n\n'
+                    '**可能原因:**\n'
+                    '1. 文件编码无法识别\n'
+                    '2. 文件已损坏\n'
+                    '3. 文件格式不正确\n\n'
+                    '**建议操作:**\n'
+                    '- 用Excel打开后另存为 UTF-8 CSV\n'
+                    '- 确认文件是标准CSV格式（逗号分隔）'
+                )
+        
+        elif file_lower.endswith('.xlsx') or file_lower.endswith('.xls'):
+            st.info('📊 识别为 Excel 文件，正在读取...')
+            try:
+                df = pd.read_excel(uploaded_file)
+            except Exception as excel_error:
+                return f'❌ 读取Excel文件失败: {str(excel_error)}\n\n请确认文件未损坏，或尝试另存为CSV格式。'
+        
         else:
-            return '不支持的文件格式。请使用 CSV 或 XLSX。'
+            # 提取文件扩展名
+            extension = original_filename.split('.')[-1] if '.' in original_filename else '无扩展名'
+            return (
+                f'❌ 不支持的文件格式\n\n'
+                f'**文件信息:**\n'
+                f'- 文件名: {original_filename}\n'
+                f'- 扩展名: .{extension}\n\n'
+                f'**支持的格式:**\n'
+                f'- .csv (推荐)\n'
+                f'- .xlsx\n'
+                f'- .xls\n\n'
+                f'请转换文件格式后重新上传。'
+            )
         
+        # 🟢 验证DataFrame
+        if df is None:
+            return '❌ 文件读取失败，返回空数据'
+        
+        if df.empty:
+            return '❌ 文件内容为空，没有数据行'
+        
+        # 显示读取成功信息
+        st.success(f'✅ 文件读取成功！')
+        st.info(f'📊 数据维度: **{len(df)}** 行 × **{len(df.columns)}** 列')
+        
+        # 显示前几列的列名
+        preview_cols = df.columns.tolist()[:5]
+        if len(df.columns) > 5:
+            st.info(f'📋 列名预览: {", ".join(preview_cols)} ... (共{len(df.columns)}列)')
+        else:
+            st.info(f'📋 列名: {", ".join(preview_cols)}')
+        
+        # 清洗数据
+        st.info('🧹 正在清洗数据...')
         df = clean_data(df, table_name, DB_CONFIG['database'])
         
         if df.empty:
-            return '文件为空或无有效数据'
+            return '❌ 数据清洗后为空，可能所有数据都是无效的'
         
-        # 🟢 改为动态获取数据库表结构并验证:
+        # 验证表结构
+        st.info('🔍 正在验证表结构...')
         engine = get_engine()
         db_columns = get_table_columns(engine, table_name, DB_CONFIG['database'])
         
         if not db_columns:
-            return f'无法获取表 {table_name} 的结构信息'
+            return f'❌ 无法获取表 {table_name} 的结构信息\n\n请检查:\n1. 表是否存在\n2. 数据库连接是否正常\n3. 是否有查询权限'
         
-        # 检查上传文件的列是否都在数据库表中
+        # 检查列名匹配
         file_columns = df.columns.tolist()
         invalid_cols = [col for col in file_columns if col not in db_columns]
         
         if invalid_cols:
             return (
-                f'❌ 文件包含数据库表中不存在的列:\n'
-                f'无效列: {", ".join(invalid_cols)}\n\n'
-                f'数据库表 [{table_name}] 的有效列:\n'
+                f'❌ 表头验证失败\n\n'
+                f'**文件中存在数据库表不包含的列:**\n'
+                f'{", ".join(invalid_cols)}\n\n'
+                f'**数据库表 [{table_name}] 的所有列:**\n'
                 f'{", ".join(db_columns)}\n\n'
-                f'请修改文件,确保所有列名都在数据库表中。'
+                f'**请执行以下操作之一:**\n'
+                f'1. 删除文件中的无效列\n'
+                f'2. 修改列名使其匹配数据库表\n'
+                f'3. 在数据库中添加缺失的列'
             )
         
-        st.info(f'✅ 表头验证通过! 文件列数: {len(file_columns)}, 数据库列数: {len(db_columns)}')
+        st.success(f'✅ 表头验证通过！')
+        st.info(f'📊 文件列: {len(file_columns)} 个 | 数据库列: {len(db_columns)} 个')
         
-        # 继续原有逻辑...
+        # 保存到session state
         st.session_state.current_df = df
         st.session_state.current_table = table_name
         st.session_state.current_mode = upload_mode
         st.session_state.current_uploaded_file = uploaded_file
         
+        # 生成备份
         if not st.session_state.backup_generated:
+            st.info('💾 正在生成备份...')
             success, backup_info = backup_table_before_upload(table_name)
             if not success:
-                return backup_info
+                return f'❌ 备份失败: {backup_info}'
             
             st.session_state.backup_buffer, st.session_state.backup_filename, st.session_state.backup_row_msg = backup_info
             st.session_state.backup_generated = True
+            st.success('✅ 备份已生成')
         
         return 'backup_ready'
     
     except Exception as e:
         st.session_state.backup_generated = False
-        return f'上传失败: {str(e)}'
+        
+        # 详细的错误信息
+        import traceback
+        error_detail = traceback.format_exc()
+        
+        st.error('💥 发生错误')
+        with st.expander('🔍 查看详细错误信息', expanded=True):
+            st.code(error_detail)
+        
+        return f'❌ 上传失败: {str(e)}\n\n点击上方展开查看详细错误信息'
 
 # ==================== UI组件 ====================
 def render_table_selector():
