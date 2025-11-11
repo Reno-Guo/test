@@ -809,7 +809,7 @@ def render_main_ui():
         st.warning(f'⚠️ 备份文件已生成{st.session_state.backup_row_msg}')
         st.info('📌 **重要提示**: 请先下载备份文件,然后勾选确认框,最后点击"继续上传"按钮。')
         
-        col1, col2 = st.columns([3, 1])
+        col1, col2 = st.columns([2, 1])
         with col1:
             st.download_button(label=f'💾 下载备份文件: {st.session_state.backup_filename}', data=st.session_state.backup_buffer,
                                file_name=st.session_state.backup_filename, mime='text/csv', use_container_width=True)
