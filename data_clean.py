@@ -2,7 +2,7 @@
 import streamlit as st
 import io
 import zipfile
-from main import render_app_header, process_zip_files, read_file_clean, write_processed_file, render_download_section
+from utils import render_app_header, process_zip_files, read_file_clean, write_processed_file, render_download_section
 
 def data_clean_app():
     render_app_header("🧹 DC - 数据清理: 删除第一行", "批量删除Excel/CSV文件的第一行数据并重新打包")
