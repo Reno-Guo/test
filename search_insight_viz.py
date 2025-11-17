@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import re
 import plotly.express as px
+import os  # Added this import
 from utils import render_app_header, unique_tmp_path, _read_excel_cached, save_workbook_to_buffer, render_download_section, get_timestamp, Workbook, dataframe_to_rows
 
 def aggregate_top_n(df, value_col, name_col, top_n=10):
