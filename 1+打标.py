@@ -522,7 +522,7 @@ st.markdown("""
     <p>💡 提示：程序会自动跳过损坏的文件并继续处理其他文件</p>
     <p style="color: #00a6e4;">Powered by Streamlit | © 2024</p>
 </div>
-""", unsafe_allow_html=True), col1))
+""", unsafe_allow_html=True))
                     
                     if not is_b0_pattern:
                         # 关键词类型判断
