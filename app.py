@@ -1,5 +1,6 @@
 # main.py
 import streamlit as st
+from uuid import uuid4
 from utils import APP_CONFIG
 from merge_data import merge_data_app
 from search_insight import search_insight_app
@@ -7,6 +8,10 @@ from search_insight_viz import search_insight_viz_app
 from data_clean import data_clean_app
 
 def main():
+    # Initialize SID here to ensure session_state is ready
+    if "SID" not in st.session_state:
+        st.session_state.SID = uuid4().hex[:6]
+
     st.set_page_config(page_title=APP_CONFIG["app_title"], layout="wide", page_icon="📊", initial_sidebar_state="collapsed")
     st.markdown("""
     <style>
