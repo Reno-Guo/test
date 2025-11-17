@@ -368,7 +368,7 @@ def process_files(data_files, match_file):
                 
                 # 计算标签
                 for col1, col2 in data_rows:
-                    is_b0_pattern = bool(re.match(r'^b0[0-9a-zA-Z]{8}
+                    is_b0_pattern = bool(re.match(r'^b0[0-9a-zA-Z]{8}$', col1))
 
 # 主界面
 st.markdown("## 📤 文件上传")
