@@ -146,7 +146,7 @@ st.markdown("""
 
 # 标题
 st.markdown('<h1 class="main-title">📊 Excel 数据词性打标工具</h1>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title">批量处理 Excel 文件，自动进行词性标注 | v2.0 Streamlit Edition</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">批量处理 Excel 文件，自动进行词性标注 | v1.0 Streamlit Edition</p>', unsafe_allow_html=True)
 
 # 侧边栏说明
 with st.sidebar:
@@ -212,12 +212,33 @@ with st.sidebar:
     
     st.markdown("### 🏷️ 标注规则")
     st.markdown("""
-    - **Brand KW**: 包含 "oneplus" 的关键词
-    - **Non-brand KW**: 不包含 "oneplus" 的关键词
-    - **Brand PAT**: 匹配的 ASIN
-    - **CMP PAT**: 不匹配的 ASIN
-    - **Auto KW/PAT**: Campaign Type 包含 "auto"
-    """)
+    <div style="font-size: 0.9rem; line-height: 1.8;">
+    <b>关键词类型：</b><br>
+    🔹 <b>Brand KW</b>: 包含 "oneplus" 的关键词<br>
+    🔹 <b>Non-brand KW</b>: 不包含 "oneplus" 的关键词<br>
+    <br>
+    <b>ASIN 类型：</b><br>
+    🔹 <b>Brand PAT</b>: 匹配文件中的 ASIN<br>
+    🔹 <b>CMP PAT</b>: 不在匹配文件中的 ASIN<br>
+    <br>
+    <b>自动广告类型：</b><br>
+    🔹 <b>Auto KW</b>: Brand PAT + Campaign Type 包含 "auto"<br>
+    🔹 <b>Auto PAT</b>: CMP PAT + Campaign Type 包含 "auto"<br>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    st.markdown("### ⚙️ 处理逻辑")
+    st.markdown("""
+    <div style="font-size: 0.85rem; background-color: #f8f9fa; padding: 10px; border-radius: 5px;">
+    1. 读取数据文件的第1列（Query）和第5列（Campaign Type）<br>
+    2. 判断 Query 是否为 B0 开头的10位 ASIN<br>
+    3. 根据规则进行标注<br>
+    4. 在原文件中创建新的 "词性打标" sheet<br>
+    5. 保留原始数据，添加标注结果
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("---")
     st.markdown("**版本**: v2.0")
@@ -228,11 +249,51 @@ if 'logs' not in st.session_state:
     st.session_state.logs = []
 if 'processed' not in st.session_state:
     st.session_state.processed = False
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
 
 def add_log(message):
     """添加日志"""
     timestamp = time.strftime("%H:%M:%S")
     st.session_state.logs.append(f"[{timestamp}] {message}")
+
+def check_password():
+    """验证密码"""
+    def password_entered():
+        if st.session_state["password"] == "owoneplus2025":
+            st.session_state.authenticated = True
+            del st.session_state["password"]  # 删除密码，不保存
+        else:
+            st.session_state.authenticated = False
+    
+    if not st.session_state.authenticated:
+        st.markdown('<h1 class="main-title">🔐 系统登录</h1>', unsafe_allow_html=True)
+        st.markdown('<p class="sub-title">请输入访问密码</p>', unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.markdown("<br><br>", unsafe_allow_html=True)
+            st.text_input(
+                "密码",
+                type="password",
+                key="password",
+                on_change=password_entered,
+                placeholder="请输入密码..."
+            )
+            
+            if "password" in st.session_state and not st.session_state.authenticated:
+                st.error("❌ 密码错误，请重试")
+            
+            st.markdown("""
+                <div style="text-align: center; margin-top: 20px; color: #666; font-size: 0.9rem;">
+                    <p>🔒 此系统仅供授权用户使用</p>
+                    <p style="color: #00a6e4;">请联系管理员获取访问密码</p>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        return False
+    
+    return True
 
 def process_files(data_files, match_file):
     """处理文件的主函数"""
@@ -350,33 +411,59 @@ def process_files(data_files, match_file):
         return [], [str(e)]
 
 # 主界面
+st.markdown("## 📤 文件上传")
+
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("### 📁 上传数据文件")
+    st.markdown("### 📁 数据文件")
+    st.markdown("""
+    <div style="background-color: #f0f9ff; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+    <small><b>格式要求：</b></small><br>
+    <small>• 文件格式：<code>.xlsx</code></small><br>
+    <small>• 第1列：Query（关键词/ASIN）</small><br>
+    <small>• 第5列：Campaign Type</small><br>
+    <small>• 第一行为表头，数据从第二行开始</small>
+    </div>
+    """, unsafe_allow_html=True)
+    
     data_files = st.file_uploader(
         "选择要处理的 Excel 文件（可多选）",
         type=['xlsx'],
         accept_multiple_files=True,
-        key="data_files"
+        key="data_files",
+        help="支持同时上传多个文件进行批量处理"
     )
     
     if data_files:
-        st.success(f"已选择 {len(data_files)} 个文件")
-        with st.expander("查看文件列表"):
-            for f in data_files:
-                st.write(f"📄 {f.name}")
+        st.success(f"✅ 已选择 {len(data_files)} 个文件")
+        with st.expander("📋 查看文件列表"):
+            for idx, f in enumerate(data_files, 1):
+                file_size = len(f.getvalue()) / 1024  # KB
+                st.write(f"{idx}. 📄 {f.name} ({file_size:.1f} KB)")
 
 with col2:
-    st.markdown("### 🔍 上传匹配文件")
+    st.markdown("### 🔍 匹配文件")
+    st.markdown("""
+    <div style="background-color: #fff5e6; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+    <small><b>格式要求：</b></small><br>
+    <small>• 文件格式：<code>.xlsx</code></small><br>
+    <small>• 第1列：ASIN 列表</small><br>
+    <small>• ASIN 格式：B0 开头的10位字符</small><br>
+    <small>• 用于判断 Brand PAT 和 CMP PAT</small>
+    </div>
+    """, unsafe_allow_html=True)
+    
     match_file = st.file_uploader(
-        "选择包含 ASIN 的匹配文件",
+        "选择包含 ASIN 的匹配文件（单个）",
         type=['xlsx'],
-        key="match_file"
+        key="match_file",
+        help="此文件用于匹配 ASIN，判断是否为品牌产品"
     )
     
     if match_file:
-        st.success(f"已选择: {match_file.name}")
+        file_size = len(match_file.getvalue()) / 1024  # KB
+        st.success(f"✅ 已选择: {match_file.name} ({file_size:.1f} KB)")
 
 st.markdown("---")
 
