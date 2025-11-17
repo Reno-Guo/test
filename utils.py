@@ -12,15 +12,6 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 from uuid import uuid4
 from typing import Callable, List, Any, Dict
 
-# === Concurrency-safe session + helpers ===
-if "SID" not in st.session_state:
-    st.session_state.SID = uuid4().hex[:6]
-
-def unique_tmp_path(suggest_name: str, default_ext: str = ".xlsx") -> str:
-    base, ext = os.path.splitext(suggest_name or f"result{default_ext}")
-    ext = ext or default_ext
-    return os.path.join("/tmp", f"{base}_{st.session_state.SID}_{uuid4().hex[:8]}{ext}")
-
 @st.cache_data(ttl=1800, show_spinner=False)
 def _read_excel_cached(file_or_path, sheet_name=0, engine=None):
     return pd.read_excel(file_or_path, sheet_name=sheet_name, engine=engine)
@@ -168,3 +159,8 @@ def process_price_columns(df):
     for column in price_columns:
         df[column] = df[column].apply(extract_price)
     return df
+
+def unique_tmp_path(suggest_name: str, default_ext: str = ".xlsx") -> str:
+    base, ext = os.path.splitext(suggest_name or f"result{default_ext}")
+    ext = ext or default_ext
+    return os.path.join("/tmp", f"{base}_{st.session_state.SID}_{uuid4().hex[:8]}{ext}")
