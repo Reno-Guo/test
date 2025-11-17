@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 import os
-from main import render_app_header, unique_tmp_path, process_zip_files, read_file_merge, process_price_columns, save_df_to_buffer, render_download_section, get_timestamp
+from utils import render_app_header, unique_tmp_path, process_zip_files, read_file_merge, process_price_columns, save_df_to_buffer, render_download_section
 
 def merge_data_app():
     render_app_header("📊 MI/SI - 合并数据表格", "将多个Excel文件合并为一个统一的数据表格")
