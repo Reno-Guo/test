@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import io
 import re
-from main import render_app_header, _read_excel_cached, unique_tmp_path, save_workbook_to_buffer, render_download_section, get_timestamp, Workbook, dataframe_to_rows
+from utils import render_app_header, _read_excel_cached, unique_tmp_path, save_workbook_to_buffer, render_download_section, get_timestamp, Workbook, dataframe_to_rows
 
 def analyze_search_rows(df: pd.DataFrame, params: list[tuple]):
     punct = str.maketrans("", "", '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~')
