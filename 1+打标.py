@@ -44,6 +44,7 @@ def add_log(message):
 def check_password():
     """验证密码"""
     def password_entered():
+        st.session_state.password_attempted = True
         if st.session_state["password"] == "owoneplus2025":
             st.session_state.authenticated = True
             del st.session_state["password"]
@@ -57,7 +58,7 @@ def check_password():
         with col2:
             st.markdown("<br><br>", unsafe_allow_html=True)
             st.text_input("密码", type="password", key="password", on_change=password_entered, placeholder="请输入密码...")
-            if "password" in st.session_state and not st.session_state.authenticated:
+            if st.session_state.get("password_attempted", False) and not st.session_state.authenticated:
                 st.error("❌ 密码错误，请重试")
             st.markdown('<div style="text-align: center; margin-top: 20px; color: #666;"><p>🔒 此系统仅供授权用户使用</p><p style="color: #00a6e4;">请联系管理员获取访问密码</p></div>', unsafe_allow_html=True)
         return False
