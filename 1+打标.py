@@ -144,9 +144,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# 密码验证 - 必须在所有内容之前
+if not check_password():
+    st.stop()  # 如果未通过验证，停止执行后续代码
+
 # 标题
 st.markdown('<h1 class="main-title">📊 Excel 数据词性打标工具</h1>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title">批量处理 Excel 文件，自动进行词性标注 | v1.0 Streamlit Edition</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">批量处理 Excel 文件，自动进行词性标注 | v2.0 Streamlit Edition</p>', unsafe_allow_html=True)
 
 # 侧边栏说明
 with st.sidebar:
@@ -214,16 +218,16 @@ with st.sidebar:
     st.markdown("""
     <div style="font-size: 0.9rem; line-height: 1.8;">
     <b>关键词类型：</b><br>
-    🔹 <b>Brand KW</b>: 包含 "oneplus" 的关键词<br>
-    🔹 <b>Non-brand KW</b>: 不包含 "oneplus" 的关键词<br>
+    🔹 <b>Brand KW</b>: 品牌关键词，oneplus相关短语关键词<br>
+    🔹 <b>Non-brand KW</b>: 除了oneplus外所有关键词<br>
     <br>
     <b>ASIN 类型：</b><br>
-    🔹 <b>Brand PAT</b>: 匹配文件中的 ASIN<br>
-    🔹 <b>CMP PAT</b>: 不在匹配文件中的 ASIN<br>
+    🔹 <b>Brand PAT</b>: OnePlus相关asin<br>
+    🔹 <b>CMP PAT</b>: 竞手Asin（除oneplus相关asin外的所有asin）<br>
     <br>
     <b>自动广告类型：</b><br>
-    🔹 <b>Auto KW</b>: Brand PAT + Campaign Type 包含 "auto"<br>
-    🔹 <b>Auto PAT</b>: CMP PAT + Campaign Type 包含 "auto"<br>
+    🔹 <b>Auto KW</b>: OnePlus相关asin，但是有标记自动广告的<br>
+    🔹 <b>Auto PAT</b>: 竞手Asin，但是有标记自动广告的<br>
     </div>
     """, unsafe_allow_html=True)
     
@@ -234,9 +238,11 @@ with st.sidebar:
     <div style="font-size: 0.85rem; background-color: #f8f9fa; padding: 10px; border-radius: 5px;">
     1. 读取数据文件的第1列（Query）和第5列（Campaign Type）<br>
     2. 判断 Query 是否为 B0 开头的10位 ASIN<br>
-    3. 根据规则进行标注<br>
-    4. 在原文件中创建新的 "词性打标" sheet<br>
-    5. 保留原始数据，添加标注结果
+    3. 对关键词：检查是否包含 "oneplus"<br>
+    4. 对ASIN：检查是否在匹配文件中（OnePlus产品）<br>
+    5. 对自动广告：检查 Campaign Type 是否包含 "auto"<br>
+    6. 在原文件中创建新的 "词性打标" sheet<br>
+    7. 保留原始数据，添加标注结果
     </div>
     """, unsafe_allow_html=True)
     
@@ -319,7 +325,7 @@ def process_files(data_files, match_file):
         
         match_wb.close()
         os.unlink(match_file_path)
-        add_log(f"✅ 匹配文件加载完成 (共 {len(match_set)} 个唯一ASIN)")
+        add_log(f"✅ 匹配文件加载完成 (共 {len(match_set)} 个 OnePlus ASIN)")
         
         # 创建进度条
         progress_bar = st.progress(0)
@@ -362,24 +368,181 @@ def process_files(data_files, match_file):
                 
                 # 计算标签
                 for col1, col2 in data_rows:
-                    is_b0_pattern = bool(re.match(r'^b0[0-9a-zA-Z]{8}$', col1))
+                    is_b0_pattern = bool(re.match(r'^b0[0-9a-zA-Z]{8}
+
+# 主界面
+st.markdown("## 📤 文件上传")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("### 📁 数据文件")
+    st.markdown("""
+    <div style="background-color: #f0f9ff; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+    <small><b>格式要求：</b></small><br>
+    <small>• 文件格式：<code>.xlsx</code></small><br>
+    <small>• 第1列：Query（关键词/ASIN）</small><br>
+    <small>• 第5列：Campaign Type</small><br>
+    <small>• 第一行为表头，数据从第二行开始</small>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    data_files = st.file_uploader(
+        "选择要处理的 Excel 文件（可多选）",
+        type=['xlsx'],
+        accept_multiple_files=True,
+        key="data_files",
+        help="支持同时上传多个文件进行批量处理"
+    )
+    
+    if data_files:
+        st.success(f"✅ 已选择 {len(data_files)} 个文件")
+        with st.expander("📋 查看文件列表"):
+            for idx, f in enumerate(data_files, 1):
+                file_size = len(f.getvalue()) / 1024  # KB
+                st.write(f"{idx}. 📄 {f.name} ({file_size:.1f} KB)")
+
+with col2:
+    st.markdown("### 🔍 匹配文件")
+    st.markdown("""
+    <div style="background-color: #fff5e6; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+    <small><b>格式要求：</b></small><br>
+    <small>• 文件格式：<code>.xlsx</code></small><br>
+    <small>• 第1列：ASIN 列表</small><br>
+    <small>• ASIN 格式：B0 开头的10位字符</small><br>
+    <small>• 用于判断 Brand PAT 和 CMP PAT</small>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    match_file = st.file_uploader(
+        "选择包含 ASIN 的匹配文件（单个）",
+        type=['xlsx'],
+        key="match_file",
+        help="此文件用于匹配 ASIN，判断是否为品牌产品"
+    )
+    
+    if match_file:
+        file_size = len(match_file.getvalue()) / 1024  # KB
+        st.success(f"✅ 已选择: {match_file.name} ({file_size:.1f} KB)")
+
+st.markdown("---")
+
+# 处理按钮
+col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 1])
+with col_btn2:
+    if st.button("🚀 开始处理", disabled=not (data_files and match_file), use_container_width=True):
+        with st.spinner("正在处理中，请稍候..."):
+            processed_files, errors = process_files(data_files, match_file)
+            st.session_state.processed = True
+            st.session_state.processed_files = processed_files
+            st.session_state.errors = errors
+
+# 显示处理结果
+if st.session_state.processed and 'processed_files' in st.session_state:
+    st.markdown("---")
+    
+    # 统计信息
+    col_stat1, col_stat2, col_stat3 = st.columns(3)
+    
+    with col_stat1:
+        st.markdown(f"""
+        <div class="stat-card">
+            <div class="stat-number">{len(st.session_state.processed_files)}</div>
+            <div class="stat-label">成功处理</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_stat2:
+        st.markdown(f"""
+        <div class="stat-card">
+            <div class="stat-number">{len(st.session_state.errors)}</div>
+            <div class="stat-label">处理失败</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_stat3:
+        st.markdown(f"""
+        <div class="stat-card">
+            <div class="stat-number">{len(data_files)}</div>
+            <div class="stat-label">总文件数</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # 下载按钮
+    if st.session_state.processed_files:
+        if len(st.session_state.processed_files) == 1:
+            # 单个文件直接下载
+            filename, content = st.session_state.processed_files[0]
+            st.download_button(
+                label="⬇️ 下载处理后的文件",
+                data=content,
+                file_name=filename,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+        else:
+            # 多个文件打包下载
+            zip_buffer = BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                for filename, content in st.session_state.processed_files:
+                    zip_file.writestr(filename, content)
+            
+            st.download_button(
+                label="⬇️ 下载所有处理后的文件 (ZIP)",
+                data=zip_buffer.getvalue(),
+                file_name="processed_files.zip",
+                mime="application/zip",
+                use_container_width=True
+            )
+    
+    # 显示错误
+    if st.session_state.errors:
+        with st.expander("⚠️ 查看错误详情", expanded=False):
+            for error in st.session_state.errors:
+                st.error(error)
+
+# 日志显示
+if st.session_state.logs:
+    st.markdown("---")
+    st.markdown("### 📋 处理日志")
+    log_container = st.container()
+    with log_container:
+        log_html = '<div class="log-container">'
+        for log in st.session_state.logs:
+            log_html += f'<div class="log-entry">{log}</div>'
+        log_html += '</div>'
+        st.markdown(log_html, unsafe_allow_html=True)
+
+# 页脚
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; color: #666; font-size: 0.85rem;">
+    <p>💡 提示：程序会自动跳过损坏的文件并继续处理其他文件</p>
+    <p style="color: #00a6e4;">Powered by Streamlit | © 2024</p>
+</div>
+""", unsafe_allow_html=True), col1))
                     
                     if not is_b0_pattern:
+                        # 关键词类型判断
                         if "oneplus" in col1:
-                            label = "Brand KW"
+                            label = "Brand KW"  # 品牌关键词，oneplus相关短语关键词
                         else:
-                            label = "Non-brand KW"
+                            label = "Non-brand KW"  # 除了oneplus外所有关键词
                     else:
+                        # ASIN 类型判断
                         if col1 in match_set:
-                            label = "Brand PAT"
+                            label = "Brand PAT"  # OnePlus相关asin
                         else:
-                            label = "CMP PAT"
+                            label = "CMP PAT"  # 竞手Asin(除oneplus相关asin外的所有asin)
                         
+                        # 检查是否为自动广告
                         if "auto" in col2:
                             if label == "Brand PAT":
-                                label = "Auto KW"
+                                label = "Auto KW"  # OnePlus相关asin, 但是有标记自动广告的
                             elif label == "CMP PAT":
-                                label = "Auto PAT"
+                                label = "Auto PAT"  # 竞手Asin, 但是有标记自动广告的
                     
                     new_ws.append([col1, col2, label])
                 
