@@ -569,9 +569,9 @@ st.markdown("""
         
         return processed_files, errors
         
-    except Exception as e:
-        add_log(f"❌ 发生错误: {str(e)}")
-        return [], [str(e)]
+        except Exception as e:
+            add_log(f"❌ 发生错误: {str(e)}")
+            return [], [str(e)]
 
 # 主界面
 st.markdown("## 📤 文件上传")
