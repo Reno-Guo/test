@@ -563,10 +563,11 @@ def data_clean_app():
             prog = st.progress(0)
             status.text("正在打包ZIP文件...")
             buffer = io.BytesIO()
-            with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as nz:
+            with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as nz:
+                nz.setpassword(None)
                 for i, p in enumerate(processed):
-                    arc = os.path.basename(p).replace("cleaned_", "")
-                    nz.write(p, arc)
+                    original_name = os.path.basename(p).replace("cleaned_", "")
+                    nz.write(p, original_name, compress_type=zipfile.ZIP_DEFLATED)
                     prog.progress((i + 1) / len(processed))
             buffer.seek(0)
             status.text("打包完成")
