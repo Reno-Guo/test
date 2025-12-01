@@ -28,13 +28,27 @@ def calculate_and_display(keywords_list):
     comprehensive_rec_cpc = df['weighted_rec_cpc'].sum()
     comprehensive_max_cpc = df['weighted_max_cpc'].sum()
     
+    # 检查是否有CVR列
+    has_cvr = 'cvr' in df.columns
+    if has_cvr:
+        df['weighted_cvr'] = df['weight_W'] * df['cvr']
+        comprehensive_cvr = df['weighted_cvr'].sum()
+    
     # 显示结果
     st.success("✅ 计算完成！")
     
     # 显示综合CPC结果
     st.markdown("## 📈 计算结果")
     
-    col1, col2 = st.columns(2)
+    if has_cvr:
+        col1, col2, col3 = st.columns(3)
+        with col3:
+            st.metric(
+                label="综合CVR",
+                value=f"{comprehensive_cvr:.2%}"
+            )
+    else:
+        col1, col2 = st.columns(2)
     
     with col1:
         st.metric(
@@ -58,15 +72,25 @@ def calculate_and_display(keywords_list):
     display_df['加权推荐CPC'] = display_df['weighted_rec_cpc'].round(4)
     display_df['加权最高CPC'] = display_df['weighted_max_cpc'].round(4)
     
-    final_display = display_df[[
+    columns_to_display = [
         'keyword', 'aba_rank', 'recommended_cpc', 'max_cpc',
         '价值分数 (S)', '权重 (W)', '加权推荐CPC', '加权最高CPC'
-    ]]
-    
-    final_display.columns = [
+    ]
+    final_columns = [
         '关键词', 'ABA Rank', '推荐CPC', '最高CPC',
         '价值分数 (S)', '权重 (W)', '加权推荐CPC', '加权最高CPC'
     ]
+    
+    if has_cvr:
+        display_df['点击转化率 (CVR)'] = (display_df['cvr'] * 100).round(2).astype(str) + '%'
+        display_df['加权CVR'] = (display_df['weighted_cvr'] * 100).round(4).astype(str) + '%'
+        columns_to_display.insert(4, 'cvr')
+        final_columns.insert(4, '点击转化率 (CVR)')
+        columns_to_display.append('加权CVR')
+        final_columns.append('加权CVR')
+    
+    final_display = display_df[columns_to_display]
+    final_display.columns = final_columns
     
     st.dataframe(final_display, use_container_width=True, hide_index=True)
     
@@ -83,6 +107,9 @@ def calculate_and_display(keywords_list):
         
         3. **综合CPC**  
            `综合CPC = ∑(W × CPC)`
+        
+        4. **综合CVR** (如果提供)  
+           `综合CVR = ∑(W × CVR)`
         
         ---
         
@@ -209,6 +236,7 @@ with tab2:
         st.markdown("- 关键词列（用于匹配文件1）")
         st.markdown("- 建议竞价-推荐列（对应推荐CPC）")
         st.markdown("- 建议竞价-最高列（对应最高CPC）")
+        st.markdown("- 点击转化率列（对应CVR）")
         
         file2 = st.file_uploader(
             "上传竞价文件", 
@@ -267,7 +295,7 @@ with tab2:
             
             # 让用户选择文件2的表头行和列
             st.markdown("#### 🔧 文件2配置")
-            col1, col2, col3, col4 = st.columns(4)
+            col1, col2, col3, col4, col5 = st.columns(5)
             
             with col1:
                 header_row_2 = st.number_input(
@@ -302,6 +330,13 @@ with tab2:
                     key="max_cpc_col"
                 )
             
+            with col5:
+                cvr_col = st.selectbox(
+                    "选择点击转化率列",
+                    options=df2.columns.tolist(),
+                    key="cvr_col"
+                )
+            
             st.markdown("---")
             
             # 计算按钮
@@ -311,8 +346,8 @@ with tab2:
                     df1_filtered = df1[[keyword_col, rank_col]].copy()
                     df1_filtered.columns = ['keyword', 'aba_rank']
                     
-                    df2_filtered = df2[[keyword_col_2, rec_cpc_col, max_cpc_col]].copy()
-                    df2_filtered.columns = ['keyword', 'recommended_cpc', 'max_cpc']
+                    df2_filtered = df2[[keyword_col_2, rec_cpc_col, max_cpc_col, cvr_col]].copy()
+                    df2_filtered.columns = ['keyword', 'recommended_cpc', 'max_cpc', 'cvr']
                     
                     # 清理数据
                     df1_filtered = df1_filtered.dropna()
@@ -335,6 +370,7 @@ with tab2:
                         merged_df['aba_rank'] = pd.to_numeric(merged_df['aba_rank'], errors='coerce')
                         merged_df['recommended_cpc'] = pd.to_numeric(merged_df['recommended_cpc'], errors='coerce')
                         merged_df['max_cpc'] = pd.to_numeric(merged_df['max_cpc'], errors='coerce')
+                        merged_df['cvr'] = pd.to_numeric(merged_df['cvr'], errors='coerce')
                         
                         # 移除无效数据
                         merged_df = merged_df.dropna()
