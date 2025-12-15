@@ -76,79 +76,96 @@ def render_app_header(emoji_title: str, subtitle: str):
 def get_timestamp() -> str:
     return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-def read_csv_with_encoding(file_path, **kwargs):
-    """尝试多种编码读取CSV文件"""
-    encodings = ['utf-8', 'gbk', 'gb2312', 'latin-1', 'cp1252']
+def csv_to_xlsx(csv_path: str, header_row: int = 0) -> pd.DataFrame:
+    """将CSV文件转换为XLSX格式的DataFrame"""
+    # 尝试多种编码读取CSV
+    encodings = ['utf-8', 'gbk', 'gb2312', 'latin-1', 'cp1252', 'iso-8859-1']
+    
     for encoding in encodings:
         try:
-            df = pd.read_csv(file_path, encoding=encoding, **kwargs)
+            df = pd.read_csv(csv_path, encoding=encoding, header=header_row)
             return df
         except UnicodeDecodeError:
             continue
-        except Exception:
-            continue
-    # 如果所有编码都失败，使用默认编码
-    return pd.read_csv(file_path, **kwargs)
+        except Exception as e:
+            if "encoding" in str(e).lower():
+                continue
+            else:
+                # 如果不是编码错误，则可能是其他问题，记录但继续尝试
+                continue
+    
+    # 如果所有编码都失败，使用默认编码并忽略错误
+    df = pd.read_csv(csv_path, encoding='utf-8', header=header_row, encoding_errors='ignore')
+    return df
 
 def process_zip_files(
     uploaded_file,
-    read_cb: Callable[[str], pd.DataFrame | None],
-    process_cb: Callable[[pd.DataFrame, str, str], Any],
-) -> List[Any]:
+    header_row: int = 0,
+    expected_cols: List[str] = None
+) -> pd.DataFrame:
+    """处理ZIP文件，将所有CSV/XLSX文件合并为一个DataFrame"""
     with tempfile.TemporaryDirectory() as temp_dir:
         zip_path = os.path.join(temp_dir, uploaded_file.name)
         with open(zip_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         with zipfile.ZipFile(zip_path, "r") as z:
             z.extractall(temp_dir)
-        files = [f for f in os.listdir(temp_dir) if f.lower().endswith((".xlsx", ".xls", ".csv"))]
+        
+        # 获取所有CSV和XLSX文件
+        files = [f for f in os.listdir(temp_dir) if f.lower().endswith(('.csv', '.xlsx', '.xls'))]
         if not files:
-            st.warning("📂 压缩文件中未找到任何 Excel 或 CSV 文件")
-            return []
-        results = []
+            st.warning("📂 压缩文件中未找到任何 CSV 或 Excel 文件")
+            return pd.DataFrame()
+        
+        dfs = []
         pb = st.progress(0)
         status = st.empty()
+        
         for i, f in enumerate(files):
             status.text(f"正在处理: {f} ({i+1}/{len(files)})")
             fp = os.path.join(temp_dir, f)
+            
             try:
-                df = read_cb(fp)
-                if df is None:
-                    raise ValueError("不支持的文件格式")
-                results.append(process_cb(df, f, temp_dir))
+                if f.lower().endswith('.csv'):
+                    # CSV文件转换为DataFrame
+                    df = csv_to_xlsx(fp, header_row=header_row)
+                else:
+                    # Excel文件直接读取
+                    df = pd.read_excel(fp, header=header_row)
+                
+                # 如果指定了预期列，确保DataFrame包含这些列
+                if expected_cols:
+                    for col in expected_cols:
+                        if col not in df.columns:
+                            df[col] = pd.NA
+                
+                dfs.append(df)
             except Exception as e:
                 st.error(f"❌ 处理文件 {f} 失败: {e}")
+            
             pb.progress((i + 1) / len(files))
+        
         status.empty()
         pb.empty()
-        return results
-
-def read_month_rev_file(file_path: str) -> pd.DataFrame | None:
-    """读取月度收入文件，表头在第二行"""
-    try:
-        df = read_csv_with_encoding(file_path, header=1)
-        return df
-    except Exception as e:
-        st.error(f"读取月度收入文件失败: {e}")
-        return None
-
-def read_month_units_file(file_path: str) -> pd.DataFrame | None:
-    """读取月度单位文件，表头在第二行"""
-    try:
-        df = read_csv_with_encoding(file_path, header=1)
-        return df
-    except Exception as e:
-        st.error(f"读取月度单位文件失败: {e}")
-        return None
-
-def read_asin_detail_file(file_path: str) -> pd.DataFrame | None:
-    """读取ASIN详细信息文件"""
-    try:
-        df = read_csv_with_encoding(file_path)
-        return df
-    except Exception as e:
-        st.error(f"读取ASIN详细信息文件失败: {e}")
-        return None
+        
+        if dfs:
+            # 合并所有DataFrame
+            all_columns = set()
+            for df in dfs:
+                all_columns.update(df.columns.tolist())
+            
+            # 标准化所有DataFrame的列
+            standardized_dfs = []
+            for df in dfs:
+                missing_cols = all_columns - set(df.columns)
+                for col in missing_cols:
+                    df[col] = pd.NA
+                df = df.reindex(columns=sorted(all_columns))
+                standardized_dfs.append(df)
+            
+            return pd.concat(standardized_dfs, ignore_index=True, sort=False)
+        else:
+            return pd.DataFrame()
 
 def sales_data_merge_app():
     render_app_header("🔗 销售数据合并工具", "合并月度收入、单位数据与ASIN详细信息")
@@ -182,87 +199,21 @@ def sales_data_merge_app():
             return
         
         with st.spinner("🔄 正在处理数据，请稍候..."):
-            # 读取月度收入数据
-            rev_results = process_zip_files(rev_zip_file, read_month_rev_file, lambda df, fname, tdir: df)
-            if not rev_results:
-                st.error("❌ 无法读取月度收入数据")
-                return
-            # 确保所有DataFrame有相同的列结构后再合并
-            if rev_results:
-                # 获取所有可能的列名
-                all_columns = set()
-                for df in rev_results:
-                    all_columns.update(df.columns.tolist())
-                
-                # 标准化所有DataFrame的列
-                standardized_rev_results = []
-                for df in rev_results:
-                    # 添加缺失的列并填充值为NaN
-                    missing_cols = all_columns - set(df.columns)
-                    for col in missing_cols:
-                        df[col] = pd.NA
-                    # 确保列顺序一致
-                    df = df.reindex(columns=sorted(all_columns))
-                    standardized_rev_results.append(df)
-                
-                rev_df = pd.concat(standardized_rev_results, ignore_index=True)
-            else:
+            # 读取月度收入数据 (表头在第2行，即header=1)
+            rev_df = process_zip_files(rev_zip_file, header_row=1)
+            if rev_df.empty:
                 st.error("❌ 无法读取月度收入数据")
                 return
             
-            # 读取月度单位数据
-            units_results = process_zip_files(units_zip_file, read_month_units_file, lambda df, fname, tdir: df)
-            if not units_results:
-                st.error("❌ 无法读取月度单位数据")
-                return
-            # 确保所有DataFrame有相同的列结构后再合并
-            if units_results:
-                # 获取所有可能的列名
-                all_columns = set()
-                for df in units_results:
-                    all_columns.update(df.columns.tolist())
-                
-                # 标准化所有DataFrame的列
-                standardized_units_results = []
-                for df in units_results:
-                    # 添加缺失的列并填充值为NaN
-                    missing_cols = all_columns - set(df.columns)
-                    for col in missing_cols:
-                        df[col] = pd.NA
-                    # 确保列顺序一致
-                    df = df.reindex(columns=sorted(all_columns))
-                    standardized_units_results.append(df)
-                
-                units_df = pd.concat(standardized_units_results, ignore_index=True)
-            else:
+            # 读取月度单位数据 (表头在第2行，即header=1)
+            units_df = process_zip_files(units_zip_file, header_row=1)
+            if units_df.empty:
                 st.error("❌ 无法读取月度单位数据")
                 return
             
-            # 读取ASIN详细信息数据
-            asin_results = process_zip_files(asin_zip_file, read_asin_detail_file, lambda df, fname, tdir: df)
-            if not asin_results:
-                st.error("❌ 无法读取ASIN详细信息数据")
-                return
-            # 确保所有DataFrame有相同的列结构后再合并
-            if asin_results:
-                # 获取所有可能的列名
-                all_columns = set()
-                for df in asin_results:
-                    all_columns.update(df.columns.tolist())
-                
-                # 标准化所有DataFrame的列
-                standardized_asin_results = []
-                for df in asin_results:
-                    # 添加缺失的列并填充值为NaN
-                    missing_cols = all_columns - set(df.columns)
-                    for col in missing_cols:
-                        df[col] = pd.NA
-                    # 确保列顺序一致
-                    df = df.reindex(columns=sorted(all_columns))
-                    standardized_asin_results.append(df)
-                
-                asin_df = pd.concat(standardized_asin_results, ignore_index=True)
-            else:
+            # 读取ASIN详细信息数据 (表头在第1行，即header=0)
+            asin_df = process_zip_files(asin_zip_file, header_row=0)
+            if asin_df.empty:
                 st.error("❌ 无法读取ASIN详细信息数据")
                 return
             
@@ -289,22 +240,20 @@ def sales_data_merge_app():
             
             # 合并所有月份的收入数据
             if rev_long_list:
-                # 确保所有DataFrame有相同的列结构
+                # 标准化列结构
                 all_rev_columns = set()
                 for df in rev_long_list:
                     all_rev_columns.update(df.columns.tolist())
                 
                 standardized_rev_long_list = []
                 for df in rev_long_list:
-                    # 添加缺失的列并填充值为NaN
                     missing_cols = all_rev_columns - set(df.columns)
                     for col in missing_cols:
                         df[col] = pd.NA
-                    # 确保列顺序一致
                     df = df.reindex(columns=sorted(all_rev_columns))
                     standardized_rev_long_list.append(df)
                 
-                rev_long_df = pd.concat(standardized_rev_long_list, ignore_index=True)
+                rev_long_df = pd.concat(standardized_rev_long_list, ignore_index=True, sort=False)
             else:
                 rev_long_df = pd.DataFrame(columns=['Product', 'Total Revenue', '时间'])
             
@@ -326,22 +275,20 @@ def sales_data_merge_app():
             
             # 合并所有月份的单位数据
             if units_long_list:
-                # 确保所有DataFrame有相同的列结构
+                # 标准化列结构
                 all_units_columns = set()
                 for df in units_long_list:
                     all_units_columns.update(df.columns.tolist())
                 
                 standardized_units_long_list = []
                 for df in units_long_list:
-                    # 添加缺失的列并填充值为NaN
                     missing_cols = all_units_columns - set(df.columns)
                     for col in missing_cols:
                         df[col] = pd.NA
-                    # 确保列顺序一致
                     df = df.reindex(columns=sorted(all_units_columns))
                     standardized_units_long_list.append(df)
                 
-                units_long_df = pd.concat(standardized_units_long_list, ignore_index=True)
+                units_long_df = pd.concat(standardized_units_long_list, ignore_index=True, sort=False)
             else:
                 units_long_df = pd.DataFrame(columns=['Product', 'Unit Sales', '时间'])
             
