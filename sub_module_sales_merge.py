@@ -76,14 +76,29 @@ def render_app_header(emoji_title: str, subtitle: str):
 def get_timestamp() -> str:
     return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-def csv_to_xlsx(csv_path: str, header_row: int = 0) -> pd.DataFrame:
-    """将CSV文件转换为XLSX格式的DataFrame"""
+def make_column_names_unique(cols):
+    """确保列名唯一，对重复的列名添加后缀"""
+    new_cols = []
+    seen = {}
+    for col in cols:
+        if col in seen:
+            seen[col] += 1
+            new_cols.append(f"{col}_{seen[col]}")
+        else:
+            seen[col] = 0
+            new_cols.append(col)
+    return new_cols
+
+def csv_to_dataframe(csv_path: str, header_row: int = 0) -> pd.DataFrame:
+    """将CSV文件转换为DataFrame，处理重复列名"""
     # 尝试多种编码读取CSV
     encodings = ['utf-8', 'gbk', 'gb2312', 'latin-1', 'cp1252', 'iso-8859-1']
     
     for encoding in encodings:
         try:
             df = pd.read_csv(csv_path, encoding=encoding, header=header_row)
+            # 确保列名唯一
+            df.columns = make_column_names_unique(df.columns.tolist())
             return df
         except UnicodeDecodeError:
             continue
@@ -96,12 +111,20 @@ def csv_to_xlsx(csv_path: str, header_row: int = 0) -> pd.DataFrame:
     
     # 如果所有编码都失败，使用默认编码并忽略错误
     df = pd.read_csv(csv_path, encoding='utf-8', header=header_row, encoding_errors='ignore')
+    # 确保列名唯一
+    df.columns = make_column_names_unique(df.columns.tolist())
+    return df
+
+def excel_to_dataframe(excel_path: str, header_row: int = 0) -> pd.DataFrame:
+    """将Excel文件转换为DataFrame，处理重复列名"""
+    df = pd.read_excel(excel_path, header=header_row)
+    # 确保列名唯一
+    df.columns = make_column_names_unique(df.columns.tolist())
     return df
 
 def process_zip_files(
     uploaded_file,
-    header_row: int = 0,
-    expected_cols: List[str] = None
+    header_row: int = 0
 ) -> pd.DataFrame:
     """处理ZIP文件，将所有CSV/XLSX文件合并为一个DataFrame"""
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -128,16 +151,10 @@ def process_zip_files(
             try:
                 if f.lower().endswith('.csv'):
                     # CSV文件转换为DataFrame
-                    df = csv_to_xlsx(fp, header_row=header_row)
+                    df = csv_to_dataframe(fp, header_row=header_row)
                 else:
-                    # Excel文件直接读取
-                    df = pd.read_excel(fp, header=header_row)
-                
-                # 如果指定了预期列，确保DataFrame包含这些列
-                if expected_cols:
-                    for col in expected_cols:
-                        if col not in df.columns:
-                            df[col] = pd.NA
+                    # Excel文件转换为DataFrame
+                    df = excel_to_dataframe(fp, header_row=header_row)
                 
                 dfs.append(df)
             except Exception as e:
@@ -149,21 +166,8 @@ def process_zip_files(
         pb.empty()
         
         if dfs:
-            # 合并所有DataFrame
-            all_columns = set()
-            for df in dfs:
-                all_columns.update(df.columns.tolist())
-            
-            # 标准化所有DataFrame的列
-            standardized_dfs = []
-            for df in dfs:
-                missing_cols = all_columns - set(df.columns)
-                for col in missing_cols:
-                    df[col] = pd.NA
-                df = df.reindex(columns=sorted(all_columns))
-                standardized_dfs.append(df)
-            
-            return pd.concat(standardized_dfs, ignore_index=True, sort=False)
+            # 合并所有DataFrame，允许不同的列结构
+            return pd.concat(dfs, ignore_index=True, sort=False, join='outer')
         else:
             return pd.DataFrame()
 
@@ -217,6 +221,19 @@ def sales_data_merge_app():
                 st.error("❌ 无法读取ASIN详细信息数据")
                 return
             
+            # 检查是否有所需的列
+            if 'Product' not in rev_df.columns:
+                st.error(f"❌ 月度收入文件中缺少 'Product' 列。现有列: {list(rev_df.columns)}")
+                return
+            
+            if 'Product' not in units_df.columns:
+                st.error(f"❌ 月度单位文件中缺少 'Product' 列。现有列: {list(units_df.columns)}")
+                return
+            
+            if 'ASIN' not in asin_df.columns:
+                st.error(f"❌ ASIN详细信息文件中缺少 'ASIN' 列。现有列: {list(asin_df.columns)}")
+                return
+            
             # 获取除Product Name、Brand、Total之外的月份列
             month_cols = [col for col in rev_df.columns if col not in ['Product Name', 'Brand', 'Total'] and col in units_df.columns]
             
@@ -240,20 +257,7 @@ def sales_data_merge_app():
             
             # 合并所有月份的收入数据
             if rev_long_list:
-                # 标准化列结构
-                all_rev_columns = set()
-                for df in rev_long_list:
-                    all_rev_columns.update(df.columns.tolist())
-                
-                standardized_rev_long_list = []
-                for df in rev_long_list:
-                    missing_cols = all_rev_columns - set(df.columns)
-                    for col in missing_cols:
-                        df[col] = pd.NA
-                    df = df.reindex(columns=sorted(all_rev_columns))
-                    standardized_rev_long_list.append(df)
-                
-                rev_long_df = pd.concat(standardized_rev_long_list, ignore_index=True, sort=False)
+                rev_long_df = pd.concat(rev_long_list, ignore_index=True, sort=False, join='outer')
             else:
                 rev_long_df = pd.DataFrame(columns=['Product', 'Total Revenue', '时间'])
             
@@ -275,31 +279,16 @@ def sales_data_merge_app():
             
             # 合并所有月份的单位数据
             if units_long_list:
-                # 标准化列结构
-                all_units_columns = set()
-                for df in units_long_list:
-                    all_units_columns.update(df.columns.tolist())
-                
-                standardized_units_long_list = []
-                for df in units_long_list:
-                    missing_cols = all_units_columns - set(df.columns)
-                    for col in missing_cols:
-                        df[col] = pd.NA
-                    df = df.reindex(columns=sorted(all_units_columns))
-                    standardized_units_long_list.append(df)
-                
-                units_long_df = pd.concat(standardized_units_long_list, ignore_index=True, sort=False)
+                units_long_df = pd.concat(units_long_list, ignore_index=True, sort=False, join='outer')
             else:
                 units_long_df = pd.DataFrame(columns=['Product', 'Unit Sales', '时间'])
             
-            # 为了得到您示例中的结果，我们需要为每个产品-月份组合生成一行
-            # 首先获取所有产品-月份组合
+            # 合并收入和单位数据
             if not rev_long_df.empty and not units_long_df.empty:
-                # 合并收入和单位数据
                 combined_data = rev_long_df.merge(
                     units_long_df[['Product', 'Unit Sales', '时间']], 
                     on=['Product', '时间'], 
-                    how='outer'
+                    how='inner'  # 内连接，只保留两个数据框都有的记录
                 )
             elif not rev_long_df.empty:
                 combined_data = rev_long_df.copy()
@@ -311,43 +300,30 @@ def sales_data_merge_app():
                 st.error("❌ 没有可用的月度数据进行合并")
                 return
             
-            # 创建一个包含所有产品-时间组合的DataFrame
-            product_time_combos = combined_data[['Product', '时间']].drop_duplicates()
-            
-            # 对每个产品-时间组合，复制ASIN详细信息的一行
-            expanded_results = []
-            
-            for _, combo in product_time_combos.iterrows():
-                product = combo['Product']
-                time_period = combo['时间']
+            # 通过rev文件的Product列和asin详情文件的ASIN列进行内连接（只保留匹配的记录）
+            if not combined_data.empty:
+                # 将合并的数据与ASIN详细信息按Product和ASIN列进行内连接
+                final_result = asin_df.merge(
+                    combined_data,
+                    left_on='ASIN',  # ASIN详细信息的ASIN列
+                    right_on='Product',  # 月度数据的Product列
+                    how='inner'  # 内连接，只保留三者都匹配的记录
+                )
                 
-                # 获取该产品的ASIN详细信息
-                product_details = asin_df[asin_df['Product'] == product].copy()
-                
-                if not product_details.empty:
-                    # 为该时间周期添加收入和单位数据
-                    rev_mask = (combined_data['Product'] == product) & (combined_data['时间'] == time_period)
-                    rev_values = combined_data.loc[rev_mask, 'Total Revenue']
-                    unit_mask = (combined_data['Product'] == product) & (combined_data['时间'] == time_period)
-                    unit_values = combined_data.loc[unit_mask, 'Unit Sales']
-                    
-                    # 复制每一行并更新Total Revenue和Unit Sales列
-                    for idx, row in product_details.iterrows():
-                        new_row = row.copy()
-                        if not rev_values.empty and pd.notna(rev_values.iloc[0]):
-                            new_row['Total Revenue'] = rev_values.iloc[0]
-                        if not unit_values.empty and pd.notna(unit_values.iloc[0]):
-                            new_row['Unit Sales'] = unit_values.iloc[0]
-                        
-                        # 添加时间列
-                        new_row['时间'] = time_period
-                        expanded_results.append(new_row)
-            
-            if expanded_results:
-                final_result = pd.DataFrame(expanded_results)
+                # 删除重复的Product列（因为ASIN和Product应该是同一列）
+                if 'Product_y' in final_result.columns:
+                    final_result = final_result.drop(columns=['Product_y'])
+                    final_result = final_result.rename(columns={'Product_x': 'Product'})
+                elif 'Product' in final_result.columns and 'ASIN' in final_result.columns:
+                    # 如果只有一边有Product列，保留ASIN作为主键
+                    pass
             else:
-                final_result = asin_df.copy()
-                final_result['时间'] = None
+                st.error("❌ 没有匹配的记录可以合并")
+                return
+            
+            if final_result.empty:
+                st.warning("⚠️ 没有任何匹配的记录，请检查Product和ASIN列的值是否对应")
+                return
             
             # 保存结果
             buffer = save_df_to_buffer(final_result)
