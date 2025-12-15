@@ -1,10 +1,80 @@
-# search_insight_viz.py
 import streamlit as st
 import pandas as pd
+import os
 import re
+from datetime import datetime
+import io
+import zipfile
+import tempfile
+from openpyxl import Workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
 import plotly.express as px
-import os  # Added this import
-from utils import render_app_header, unique_tmp_path, _read_excel_cached, save_workbook_to_buffer, render_download_section, get_timestamp, Workbook, dataframe_to_rows
+from uuid import uuid4
+from typing import Callable, List, Any, Dict
+
+# 从主程序导入共享函数
+def _read_excel_cached(file_or_path, sheet_name=0, engine=None):
+    return pd.read_excel(file_or_path, sheet_name=sheet_name, engine=engine)
+
+def unique_tmp_path(suggest_name: str, default_ext: str = ".xlsx") -> str:
+    base, ext = os.path.splitext(suggest_name or f"result{default_ext}")
+    ext = ext or default_ext
+    return os.path.join("/tmp", f"{base}_{st.session_state.SID}_{uuid4().hex[:8]}{ext}")
+
+def save_workbook_to_buffer(wb: Workbook) -> io.BytesIO:
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+def render_download_section(
+    buffer: io.BytesIO,
+    file_name: str,
+    mime_type: str,
+    download_label: str,
+    key_prefix: str,
+    has_save: bool = False,
+    save_func: Callable[[], None] | None = None,
+    save_path: str | None = None,
+):
+    if has_save:
+        col_d, col_s = st.columns(2)
+        with col_d:
+            st.download_button(
+                label=download_label,
+                data=buffer,
+                file_name=file_name,
+                mime=mime_type,
+                key=f"{key_prefix}_download",
+                use_container_width=True,
+            )
+        with col_s:
+            if st.checkbox("💾 同时保存到 /tmp 目录", key=f"{key_prefix}_save"):
+                if save_func:
+                    save_func()
+                st.info(f"📁 文件已保存到 {save_path}")
+    else:
+        st.download_button(
+            label=download_label,
+            data=buffer,
+            file_name=file_name,
+            mime=mime_type,
+            key=f"{key_prefix}_download",
+            use_container_width=True,
+        )
+
+def render_app_header(emoji_title: str, subtitle: str):
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #00a6e4 0%, #0088c2 100%); padding: 2rem; border-radius: 10px; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h2 style="color: white; margin: 0; display: flex; align-items: center;">
+            {emoji_title}
+        </h2>
+        <p style="color: rgba(255,255,255,0.9); margin-top: 0.5rem;">{subtitle}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def get_timestamp() -> str:
+    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 def aggregate_top_n(df, value_col, name_col, top_n=10):
     df = df.copy()
@@ -90,7 +160,7 @@ def search_insight_viz_app():
             # Param aggregation (single pass)
             excluded = {"搜索词", "搜索量", "品牌名称", "品牌", "特性参数", "词性"}
             param_cols = [c for c in df.columns if c not in excluded]
-            param_heats: dict[str, list[dict]] = {c: [] for c in param_cols}
+            param_heats: Dict[str, List[Dict]] = {c: [] for c in param_cols}
             p_status = st.empty()
             p_prog = st.progress(0)
             p_status.text("正在处理参数...")
@@ -125,7 +195,7 @@ def search_insight_viz_app():
                 for r in dataframe_to_rows(brand_df, index=False, header=True):
                     ws.append(r)
             s_prog.progress(0.7)
-            param_dfs: dict[str, pd.DataFrame] = {}
+            param_dfs: Dict[str, pd.DataFrame] = {}
             active_params = [c for c in param_cols if param_heats[c]]
             for i, c in enumerate(active_params):
                 heats = param_heats[c]
