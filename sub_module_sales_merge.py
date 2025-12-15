@@ -187,21 +187,84 @@ def sales_data_merge_app():
             if not rev_results:
                 st.error("❌ 无法读取月度收入数据")
                 return
-            rev_df = pd.concat(rev_results, ignore_index=True)
+            # 确保所有DataFrame有相同的列结构后再合并
+            if rev_results:
+                # 获取所有可能的列名
+                all_columns = set()
+                for df in rev_results:
+                    all_columns.update(df.columns.tolist())
+                
+                # 标准化所有DataFrame的列
+                standardized_rev_results = []
+                for df in rev_results:
+                    # 添加缺失的列并填充值为NaN
+                    missing_cols = all_columns - set(df.columns)
+                    for col in missing_cols:
+                        df[col] = pd.NA
+                    # 确保列顺序一致
+                    df = df.reindex(columns=sorted(all_columns))
+                    standardized_rev_results.append(df)
+                
+                rev_df = pd.concat(standardized_rev_results, ignore_index=True)
+            else:
+                st.error("❌ 无法读取月度收入数据")
+                return
             
             # 读取月度单位数据
             units_results = process_zip_files(units_zip_file, read_month_units_file, lambda df, fname, tdir: df)
             if not units_results:
                 st.error("❌ 无法读取月度单位数据")
                 return
-            units_df = pd.concat(units_results, ignore_index=True)
+            # 确保所有DataFrame有相同的列结构后再合并
+            if units_results:
+                # 获取所有可能的列名
+                all_columns = set()
+                for df in units_results:
+                    all_columns.update(df.columns.tolist())
+                
+                # 标准化所有DataFrame的列
+                standardized_units_results = []
+                for df in units_results:
+                    # 添加缺失的列并填充值为NaN
+                    missing_cols = all_columns - set(df.columns)
+                    for col in missing_cols:
+                        df[col] = pd.NA
+                    # 确保列顺序一致
+                    df = df.reindex(columns=sorted(all_columns))
+                    standardized_units_results.append(df)
+                
+                units_df = pd.concat(standardized_units_results, ignore_index=True)
+            else:
+                st.error("❌ 无法读取月度单位数据")
+                return
             
             # 读取ASIN详细信息数据
             asin_results = process_zip_files(asin_zip_file, read_asin_detail_file, lambda df, fname, tdir: df)
             if not asin_results:
                 st.error("❌ 无法读取ASIN详细信息数据")
                 return
-            asin_df = pd.concat(asin_results, ignore_index=True)
+            # 确保所有DataFrame有相同的列结构后再合并
+            if asin_results:
+                # 获取所有可能的列名
+                all_columns = set()
+                for df in asin_results:
+                    all_columns.update(df.columns.tolist())
+                
+                # 标准化所有DataFrame的列
+                standardized_asin_results = []
+                for df in asin_results:
+                    # 添加缺失的列并填充值为NaN
+                    missing_cols = all_columns - set(df.columns)
+                    for col in missing_cols:
+                        df[col] = pd.NA
+                    # 确保列顺序一致
+                    df = df.reindex(columns=sorted(all_columns))
+                    standardized_asin_results.append(df)
+                
+                asin_df = pd.concat(standardized_asin_results, ignore_index=True)
+            else:
+                st.error("❌ 无法读取ASIN详细信息数据")
+                return
             
             # 获取除Product Name、Brand、Total之外的月份列
             month_cols = [col for col in rev_df.columns if col not in ['Product Name', 'Brand', 'Total'] and col in units_df.columns]
@@ -209,23 +272,39 @@ def sales_data_merge_app():
             # 处理月度收入数据，将其转换为长格式
             rev_long_list = []
             for month_col in month_cols:
-                month_data = rev_df[['Product', month_col]].copy()
-                month_data = month_data.dropna(subset=[month_col])  # 移除空值
-                month_data = month_data.rename(columns={month_col: 'Total Revenue'})
-                # 解析月份列名，转换为日期格式
-                try:
-                    # 尝试解析月份格式，如 "Dec-23" -> "2023-12"
-                    month_year = datetime.strptime(month_col, '%b-%y')
-                    month_str = month_year.strftime('%Y-%m')
-                except:
-                    # 如果无法解析，使用列名作为时间
-                    month_str = month_col
-                month_data['时间'] = month_str
-                rev_long_list.append(month_data)
+                if month_col in rev_df.columns:
+                    month_data = rev_df[['Product', month_col]].copy()
+                    month_data = month_data.dropna(subset=[month_col])  # 移除空值
+                    month_data = month_data.rename(columns={month_col: 'Total Revenue'})
+                    # 解析月份列名，转换为日期格式
+                    try:
+                        # 尝试解析月份格式，如 "Dec-23" -> "2023-12"
+                        month_year = datetime.strptime(month_col, '%b-%y')
+                        month_str = month_year.strftime('%Y-%m')
+                    except:
+                        # 如果无法解析，使用列名作为时间
+                        month_str = month_col
+                    month_data['时间'] = month_str
+                    rev_long_list.append(month_data)
             
             # 合并所有月份的收入数据
             if rev_long_list:
-                rev_long_df = pd.concat(rev_long_list, ignore_index=True)
+                # 确保所有DataFrame有相同的列结构
+                all_rev_columns = set()
+                for df in rev_long_list:
+                    all_rev_columns.update(df.columns.tolist())
+                
+                standardized_rev_long_list = []
+                for df in rev_long_list:
+                    # 添加缺失的列并填充值为NaN
+                    missing_cols = all_rev_columns - set(df.columns)
+                    for col in missing_cols:
+                        df[col] = pd.NA
+                    # 确保列顺序一致
+                    df = df.reindex(columns=sorted(all_rev_columns))
+                    standardized_rev_long_list.append(df)
+                
+                rev_long_df = pd.concat(standardized_rev_long_list, ignore_index=True)
             else:
                 rev_long_df = pd.DataFrame(columns=['Product', 'Total Revenue', '时间'])
             
@@ -247,7 +326,22 @@ def sales_data_merge_app():
             
             # 合并所有月份的单位数据
             if units_long_list:
-                units_long_df = pd.concat(units_long_list, ignore_index=True)
+                # 确保所有DataFrame有相同的列结构
+                all_units_columns = set()
+                for df in units_long_list:
+                    all_units_columns.update(df.columns.tolist())
+                
+                standardized_units_long_list = []
+                for df in units_long_list:
+                    # 添加缺失的列并填充值为NaN
+                    missing_cols = all_units_columns - set(df.columns)
+                    for col in missing_cols:
+                        df[col] = pd.NA
+                    # 确保列顺序一致
+                    df = df.reindex(columns=sorted(all_units_columns))
+                    standardized_units_long_list.append(df)
+                
+                units_long_df = pd.concat(standardized_units_long_list, ignore_index=True)
             else:
                 units_long_df = pd.DataFrame(columns=['Product', 'Unit Sales', '时间'])
             
@@ -285,23 +379,18 @@ def sales_data_merge_app():
                 
                 if not product_details.empty:
                     # 为该时间周期添加收入和单位数据
-                    rev_value = combined_data[
-                        (combined_data['Product'] == product) & 
-                        (combined_data['时间'] == time_period)
-                    ]['Total Revenue'].values
-                    
-                    unit_value = combined_data[
-                        (combined_data['Product'] == product) & 
-                        (combined_data['时间'] == time_period)
-                    ]['Unit Sales'].values
+                    rev_mask = (combined_data['Product'] == product) & (combined_data['时间'] == time_period)
+                    rev_values = combined_data.loc[rev_mask, 'Total Revenue']
+                    unit_mask = (combined_data['Product'] == product) & (combined_data['时间'] == time_period)
+                    unit_values = combined_data.loc[unit_mask, 'Unit Sales']
                     
                     # 复制每一行并更新Total Revenue和Unit Sales列
                     for idx, row in product_details.iterrows():
                         new_row = row.copy()
-                        if len(rev_value) > 0 and pd.notna(rev_value[0]):
-                            new_row['Total Revenue'] = rev_value[0]
-                        if len(unit_value) > 0 and pd.notna(unit_value[0]):
-                            new_row['Unit Sales'] = unit_value[0]
+                        if not rev_values.empty and pd.notna(rev_values.iloc[0]):
+                            new_row['Total Revenue'] = rev_values.iloc[0]
+                        if not unit_values.empty and pd.notna(unit_values.iloc[0]):
+                            new_row['Unit Sales'] = unit_values.iloc[0]
                         
                         # 添加时间列
                         new_row['时间'] = time_period
