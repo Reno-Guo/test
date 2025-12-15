@@ -122,11 +122,15 @@ def excel_to_dataframe(excel_path: str, header_row: int = 0) -> pd.DataFrame:
     df.columns = make_column_names_unique(df.columns.tolist())
     return df
 
-def process_zip_files(
+def process_zip_files_with_preview(
     uploaded_file,
-    header_row: int = 0
+    header_row: int = 0,
+    file_type: str = "unknown"
 ) -> pd.DataFrame:
-    """处理ZIP文件，将所有CSV/XLSX文件合并为一个DataFrame"""
+    """处理ZIP文件，将所有CSV/XLSX文件合并为一个DataFrame，并提供预览"""
+    if uploaded_file is None:
+        return pd.DataFrame()
+    
     with tempfile.TemporaryDirectory() as temp_dir:
         zip_path = os.path.join(temp_dir, uploaded_file.name)
         with open(zip_path, "wb") as f:
@@ -137,7 +141,7 @@ def process_zip_files(
         # 获取所有CSV和XLSX文件
         files = [f for f in os.listdir(temp_dir) if f.lower().endswith(('.csv', '.xlsx', '.xls'))]
         if not files:
-            st.warning("📂 压缩文件中未找到任何 CSV 或 Excel 文件")
+            st.warning(f"📂 {file_type}压缩文件中未找到任何 CSV 或 Excel 文件")
             return pd.DataFrame()
         
         dfs = []
@@ -156,6 +160,12 @@ def process_zip_files(
                     # Excel文件转换为DataFrame
                     df = excel_to_dataframe(fp, header_row=header_row)
                 
+                # 显示单个文件的预览
+                with st.expander(f"📄 {file_type} - {f} 预览"):
+                    st.write(f"**列名:** {list(df.columns)}")
+                    st.write(f"**形状:** {df.shape}")
+                    st.dataframe(df.head(5), use_container_width=True)
+                
                 dfs.append(df)
             except Exception as e:
                 st.error(f"❌ 处理文件 {f} 失败: {e}")
@@ -166,13 +176,19 @@ def process_zip_files(
         pb.empty()
         
         if dfs:
-            # 合并所有DataFrame，允许不同的列结构
-            return pd.concat(dfs, ignore_index=True, sort=False, join='outer')
+            # 合并所有DataFrame，使用concat的ignore_index=True和sort=False参数
+            # 为了避免重复索引问题，我们先重置每个DataFrame的索引
+            for df in dfs:
+                df.reset_index(drop=True, inplace=True)
+            
+            # 合并DataFrame
+            result_df = pd.concat(dfs, ignore_index=True, sort=False)
+            return result_df
         else:
             return pd.DataFrame()
 
 def sales_data_merge_app():
-    render_app_header("🔗 销售数据合并工具", "合并月度收入、单位数据与ASIN详细信息")
+    render_app_header("🔗 销售数据合并工具", "合并月度收入、单位数据与ASIN详细信息（含预览功能）")
     
     st.markdown("### 📥 上传数据文件")
     col1, col2, col3 = st.columns(3)
@@ -195,7 +211,47 @@ def sales_data_merge_app():
     
     st.divider()
     
+    preview_btn = st.button("🔍 预览数据", key="preview", use_container_width=True)
     execute_btn = st.button("🚀 开始合并数据", key="merge_execute", use_container_width=True)
+    
+    if preview_btn:
+        if not (rev_zip_file and units_zip_file and asin_zip_file):
+            st.warning("⚠️ 请上传所有三个ZIP文件")
+            return
+        
+        with st.spinner("🔄 正在加载预览数据，请稍候..."):
+            # 预览月度收入数据 (表头在第2行，即header=1)
+            rev_df = process_zip_files_with_preview(rev_zip_file, header_row=1, file_type="月度收入")
+            if not rev_df.empty:
+                st.success(f"✅ 月度收入数据已加载，共 {len(rev_df)} 行")
+                with st.expander("📊 月度收入整体预览"):
+                    st.write(f"**列名:** {list(rev_df.columns)}")
+                    st.write(f"**形状:** {rev_df.shape}")
+                    st.dataframe(rev_df.head(5), use_container_width=True)
+            else:
+                st.warning("❌ 无法加载月度收入数据")
+            
+            # 预览月度单位数据 (表头在第2行，即header=1)
+            units_df = process_zip_files_with_preview(units_zip_file, header_row=1, file_type="月度单位")
+            if not units_df.empty:
+                st.success(f"✅ 月度单位数据已加载，共 {len(units_df)} 行")
+                with st.expander("📊 月度单位整体预览"):
+                    st.write(f"**列名:** {list(units_df.columns)}")
+                    st.write(f"**形状:** {units_df.shape}")
+                    st.dataframe(units_df.head(5), use_container_width=True)
+            else:
+                st.warning("❌ 无法加载月度单位数据")
+            
+            # 预览ASIN详细信息数据 (表头在第1行，即header=0)
+            asin_df = process_zip_files_with_preview(asin_zip_file, header_row=0, file_type="ASIN详情")
+            if not asin_df.empty:
+                st.success(f"✅ ASIN详细信息数据已加载，共 {len(asin_df)} 行")
+                with st.expander("📊 ASIN详情整体预览"):
+                    st.write(f"**列名:** {list(asin_df.columns)}")
+                    st.write(f"**形状:** {asin_df.shape}")
+                    st.dataframe(asin_df.head(5), use_container_width=True)
+            else:
+                st.warning("❌ 无法加载ASIN详细信息数据")
     
     if execute_btn:
         if not (rev_zip_file and units_zip_file and asin_zip_file):
@@ -204,19 +260,19 @@ def sales_data_merge_app():
         
         with st.spinner("🔄 正在处理数据，请稍候..."):
             # 读取月度收入数据 (表头在第2行，即header=1)
-            rev_df = process_zip_files(rev_zip_file, header_row=1)
+            rev_df = process_zip_files_with_preview(rev_zip_file, header_row=1, file_type="")
             if rev_df.empty:
                 st.error("❌ 无法读取月度收入数据")
                 return
             
             # 读取月度单位数据 (表头在第2行，即header=1)
-            units_df = process_zip_files(units_zip_file, header_row=1)
+            units_df = process_zip_files_with_preview(units_zip_file, header_row=1, file_type="")
             if units_df.empty:
                 st.error("❌ 无法读取月度单位数据")
                 return
             
             # 读取ASIN详细信息数据 (表头在第1行，即header=0)
-            asin_df = process_zip_files(asin_zip_file, header_row=0)
+            asin_df = process_zip_files_with_preview(asin_zip_file, header_row=0, file_type="")
             if asin_df.empty:
                 st.error("❌ 无法读取ASIN详细信息数据")
                 return
@@ -255,9 +311,12 @@ def sales_data_merge_app():
                     month_data['时间'] = month_str
                     rev_long_list.append(month_data)
             
-            # 合并所有月份的收入数据
+            # 合并所有月份的收入数据 - 使用更安全的方式合并
             if rev_long_list:
-                rev_long_df = pd.concat(rev_long_list, ignore_index=True, sort=False, join='outer')
+                # 重置每个DataFrame的索引以避免重复索引错误
+                for df in rev_long_list:
+                    df.reset_index(drop=True, inplace=True)
+                rev_long_df = pd.concat(rev_long_list, ignore_index=True, sort=False)
             else:
                 rev_long_df = pd.DataFrame(columns=['Product', 'Total Revenue', '时间'])
             
@@ -279,7 +338,10 @@ def sales_data_merge_app():
             
             # 合并所有月份的单位数据
             if units_long_list:
-                units_long_df = pd.concat(units_long_list, ignore_index=True, sort=False, join='outer')
+                # 重置每个DataFrame的索引以避免重复索引错误
+                for df in units_long_list:
+                    df.reset_index(drop=True, inplace=True)
+                units_long_df = pd.concat(units_long_list, ignore_index=True, sort=False)
             else:
                 units_long_df = pd.DataFrame(columns=['Product', 'Unit Sales', '时间'])
             
