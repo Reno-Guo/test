@@ -204,7 +204,7 @@ def sales_data_merge_app():
             asin_df = pd.concat(asin_results, ignore_index=True)
             
             # 获取除Product Name、Brand、Total之外的月份列
-            month_cols = [col for col in rev_df.columns if col not in ['Product Name', 'Brand', 'Total']]
+            month_cols = [col for col in rev_df.columns if col not in ['Product Name', 'Brand', 'Total'] and col in units_df.columns]
             
             # 处理月度收入数据，将其转换为长格式
             rev_long_list = []
@@ -224,7 +224,10 @@ def sales_data_merge_app():
                 rev_long_list.append(month_data)
             
             # 合并所有月份的收入数据
-            rev_long_df = pd.concat(rev_long_list, ignore_index=True)
+            if rev_long_list:
+                rev_long_df = pd.concat(rev_long_list, ignore_index=True)
+            else:
+                rev_long_df = pd.DataFrame(columns=['Product', 'Total Revenue', '时间'])
             
             # 处理月度单位数据，将其转换为长格式
             units_long_list = []
@@ -243,46 +246,13 @@ def sales_data_merge_app():
                     units_long_list.append(month_data)
             
             # 合并所有月份的单位数据
-            units_long_df = pd.concat(units_long_list, ignore_index=True) if units_long_list else pd.DataFrame()
+            if units_long_list:
+                units_long_df = pd.concat(units_long_list, ignore_index=True)
+            else:
+                units_long_df = pd.DataFrame(columns=['Product', 'Unit Sales', '时间'])
             
-            # 合并收入数据到ASIN详细信息
-            result_df = asin_df.copy()
-            
-            # 添加时间列，为后续合并做准备
-            result_df['时间'] = None
-            
-            # 与收入数据合并
-            if not rev_long_df.empty:
-                result_df = result_df.merge(
-                    rev_long_df[['Product', 'Total Revenue', '时间']], 
-                    left_on=['Product'], 
-                    right_on=['Product'], 
-                    how='left'
-                )
-            
-            # 与单位数据合并
-            if not units_long_df.empty:
-                # 为了防止覆盖之前的合并结果，使用左连接并更新特定列
-                temp_units = units_long_df[['Product', 'Unit Sales', '时间']].copy()
-                temp_units = temp_units.rename(columns={'Unit Sales': 'temp_Unit_Sales', '时间': 'temp_时间'})
-                
-                # 合并单位数据
-                result_df = result_df.merge(
-                    temp_units, 
-                    left_on=['Product'], 
-                    right_on=['Product'], 
-                    how='left'
-                )
-                
-                # 将临时的Unit Sales和时间更新到主DataFrame
-                result_df['Unit Sales'] = result_df.get('temp_Unit_Sales', pd.Series([None]*len(result_df)))
-                result_df['时间'] = result_df.get('temp_时间', result_df['时间'])
-                
-                # 删除临时列
-                result_df = result_df.drop(columns=['temp_Unit_Sales', 'temp_时间'], errors='ignore')
-            
-            # 为了实现您要求的效果（每行一个月份），我们需要为每个产品-月份组合创建单独的行
-            # 首先获取所有产品和月份的组合
+            # 为了得到您示例中的结果，我们需要为每个产品-月份组合生成一行
+            # 首先获取所有产品-月份组合
             if not rev_long_df.empty and not units_long_df.empty:
                 # 合并收入和单位数据
                 combined_data = rev_long_df.merge(
@@ -300,54 +270,45 @@ def sales_data_merge_app():
                 st.error("❌ 没有可用的月度数据进行合并")
                 return
             
-            # 与ASIN详细信息合并
-            final_result = asin_df[['Product', 'ASIN']].merge(combined_data, on='Product', how='left')
-            final_result = final_result.merge(asin_df.drop(columns=['Product', 'ASIN']), left_on='Product', right_on=asin_df.columns[0], how='left')
+            # 创建一个包含所有产品-时间组合的DataFrame
+            product_time_combos = combined_data[['Product', '时间']].drop_duplicates()
             
-            # 为了得到您示例中的结果，我们需要为每个产品-月份组合生成一行
-            # 创建一个包含所有产品-月份组合的DataFrame
-            if not combined_data.empty:
-                # 获取所有唯一的产品和时间组合
-                product_time_combos = combined_data[['Product', '时间']].drop_duplicates()
+            # 对每个产品-时间组合，复制ASIN详细信息的一行
+            expanded_results = []
+            
+            for _, combo in product_time_combos.iterrows():
+                product = combo['Product']
+                time_period = combo['时间']
                 
-                # 对每个产品-月份组合，复制ASIN详细信息的一行
-                expanded_results = []
+                # 获取该产品的ASIN详细信息
+                product_details = asin_df[asin_df['Product'] == product].copy()
                 
-                for _, combo in product_time_combos.iterrows():
-                    product = combo['Product']
-                    time_period = combo['时间']
+                if not product_details.empty:
+                    # 为该时间周期添加收入和单位数据
+                    rev_value = combined_data[
+                        (combined_data['Product'] == product) & 
+                        (combined_data['时间'] == time_period)
+                    ]['Total Revenue'].values
                     
-                    # 获取该产品的ASIN详细信息
-                    product_details = asin_df[asin_df['Product'] == product].copy()
+                    unit_value = combined_data[
+                        (combined_data['Product'] == product) & 
+                        (combined_data['时间'] == time_period)
+                    ]['Unit Sales'].values
                     
-                    if not product_details.empty:
-                        # 为该时间周期添加收入和单位数据
-                        rev_value = combined_data[
-                            (combined_data['Product'] == product) & 
-                            (combined_data['时间'] == time_period)
-                        ]['Total Revenue'].values
-                        
-                        unit_value = combined_data[
-                            (combined_data['Product'] == product) & 
-                            (combined_data['时间'] == time_period)
-                        ]['Unit Sales'].values
-                        
-                        # 更新Total Revenue和Unit Sales列
-                        if len(rev_value) > 0:
-                            product_details['Total Revenue'] = rev_value[0]
-                        if len(unit_value) > 0:
-                            product_details['Unit Sales'] = unit_value[0]
+                    # 复制每一行并更新Total Revenue和Unit Sales列
+                    for idx, row in product_details.iterrows():
+                        new_row = row.copy()
+                        if len(rev_value) > 0 and pd.notna(rev_value[0]):
+                            new_row['Total Revenue'] = rev_value[0]
+                        if len(unit_value) > 0 and pd.notna(unit_value[0]):
+                            new_row['Unit Sales'] = unit_value[0]
                         
                         # 添加时间列
-                        product_details['时间'] = time_period
-                        
-                        expanded_results.append(product_details)
-                
-                if expanded_results:
-                    final_result = pd.concat(expanded_results, ignore_index=True)
-                else:
-                    final_result = asin_df.copy()
-                    final_result['时间'] = None
+                        new_row['时间'] = time_period
+                        expanded_results.append(new_row)
+            
+            if expanded_results:
+                final_result = pd.DataFrame(expanded_results)
             else:
                 final_result = asin_df.copy()
                 final_result['时间'] = None
