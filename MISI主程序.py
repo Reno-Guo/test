@@ -1,17 +1,109 @@
-# main.py
 import streamlit as st
+import pandas as pd
+import os
+import re
+from datetime import datetime
+import io
+import zipfile
+import tempfile
+from openpyxl import Workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
+import plotly.express as px
 from uuid import uuid4
-from utils import APP_CONFIG
-from merge_data import merge_data_app
-from search_insight import search_insight_app
-from search_insight_viz import search_insight_viz_app
-from data_clean import data_clean_app
+from typing import Callable, List, Any, Dict
+
+# 导入子程序模块
+from sub_module_merge import merge_data_app
+from sub_module_search_insight import search_insight_app
+from sub_module_visualization import search_insight_viz_app
+from sub_module_data_clean import data_clean_app
+from sub_module_pack_form import pack_form_labeler_app
+
+# App configuration
+APP_CONFIG = {
+    "app_title": "市场洞察小程序",
+    "author": "海翼IDC团队",
+    "version": "v1.3.0",
+    "contact": "idc@oceanwing.com",
+    "company": "Anker Oceanwing Inc."
+}
+
+# === Concurrency-safe session + helpers ===
+if "SID" not in st.session_state:
+    st.session_state.SID = uuid4().hex[:6]
+
+def unique_tmp_path(suggest_name: str, default_ext: str = ".xlsx") -> str:
+    base, ext = os.path.splitext(suggest_name or f"result{default_ext}")
+    ext = ext or default_ext
+    return os.path.join("/tmp", f"{base}_{st.session_state.SID}_{uuid4().hex[:8]}{ext}")
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _read_excel_cached(file_or_path, sheet_name=0, engine=None):
+    return pd.read_excel(file_or_path, sheet_name=sheet_name, engine=engine)
+
+# === Shared UI/render helpers ===
+def render_app_header(emoji_title: str, subtitle: str):
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #00a6e4 0%, #0088c2 100%); padding: 2rem; border-radius: 10px; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h2 style="color: white; margin: 0; display: flex; align-items: center;">
+            {emoji_title}
+        </h2>
+        <p style="color: rgba(255,255,255,0.9); margin-top: 0.5rem;">{subtitle}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def get_timestamp() -> str:
+    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+def save_df_to_buffer(df: pd.DataFrame) -> io.BytesIO:
+    buffer = io.BytesIO()
+    df.to_excel(buffer, index=False, engine="openpyxl")
+    buffer.seek(0)
+    return buffer
+
+def save_workbook_to_buffer(wb: Workbook) -> io.BytesIO:
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+def render_download_section(
+    buffer: io.BytesIO,
+    file_name: str,
+    mime_type: str,
+    download_label: str,
+    key_prefix: str,
+    has_save: bool = False,
+    save_func: Callable[[], None] | None = None,
+    save_path: str | None = None,
+):
+    if has_save:
+        col_d, col_s = st.columns(2)
+        with col_d:
+            st.download_button(
+                label=download_label,
+                data=buffer,
+                file_name=file_name,
+                mime=mime_type,
+                key=f"{key_prefix}_download",
+                use_container_width=True,
+            )
+        with col_s:
+            if st.checkbox("💾 同时保存到 /tmp 目录", key=f"{key_prefix}_save"):
+                if save_func:
+                    save_func()
+                st.info(f"📁 文件已保存到 {save_path}")
+    else:
+        st.download_button(
+            label=download_label,
+            data=buffer,
+            file_name=file_name,
+            mime=mime_type,
+            key=f"{key_prefix}_download",
+            use_container_width=True,
+        )
 
 def main():
-    # Initialize SID here to ensure session_state is ready
-    if "SID" not in st.session_state:
-        st.session_state.SID = uuid4().hex[:6]
-
     st.set_page_config(page_title=APP_CONFIG["app_title"], layout="wide", page_icon="📊", initial_sidebar_state="collapsed")
     st.markdown("""
     <style>
@@ -72,7 +164,7 @@ def main():
         <p style="color: #666; margin-bottom: 0;">选择下方功能模块开始您的数据分析之旅</p>
     </div>
     """, unsafe_allow_html=True)
-    tabs = st.tabs(["📊 合并数据表格", "🔍 搜索流量洞察", "📈 流量可视化分析", "🧹 数据清理工具"])
+    tabs = st.tabs(["📊 合并数据表格", "🔍 搜索流量洞察", "📈 流量可视化分析", "🧹 数据清理工具", "🏷️ 剂型打标工具"])
     with tabs[0]:
         merge_data_app()
     with tabs[1]:
@@ -81,6 +173,8 @@ def main():
         search_insight_viz_app()
     with tabs[3]:
         data_clean_app()
+    with tabs[4]:
+        pack_form_labeler_app()
     st.divider()
     st.markdown("""
     <div style="text-align: center; color: #666; padding: 2rem 0;">
