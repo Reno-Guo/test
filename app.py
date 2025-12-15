@@ -13,6 +13,7 @@ from uuid import uuid4
 from typing import Callable, List, Any, Dict
 
 # 导入子程序模块
+from sub_module_sales_merge import sales_data_merge_app
 from sub_module_merge import merge_data_app
 from sub_module_search_insight import search_insight_app
 from sub_module_visualization import search_insight_viz_app
@@ -164,22 +165,24 @@ def main():
         <p style="color: #666; margin-bottom: 0;">选择下方功能模块开始您的数据分析之旅</p>
     </div>
     """, unsafe_allow_html=True)
-    tabs = st.tabs(["📊 合并数据表格", "🔍 搜索流量洞察", "📈 流量可视化分析", "🧹 数据清理工具", "🏷️ 剂型打标工具"])
+    tabs = st.tabs(["🔗 销售数据合并", "📊 合并数据表格", "🔍 搜索流量洞察", "📈 流量可视化分析", "🧹 数据清理工具", "🏷️ 剂型打标工具"])
     with tabs[0]:
-        merge_data_app()
+        sales_data_merge_app()
     with tabs[1]:
-        search_insight_app()
+        merge_data_app()
     with tabs[2]:
-        search_insight_viz_app()
+        search_insight_app()
     with tabs[3]:
-        data_clean_app()
+        search_insight_viz_app()
     with tabs[4]:
+        data_clean_app()
+    with tabs[5]:
         pack_form_labeler_app()
     st.divider()
     st.markdown("""
     <div style="text-align: center; color: #666; padding: 2rem 0;">
         <p style="margin: 0;">© Anker Oceanwing Inc. | 海翼IDC团队</p>
-        <p style="margin: 0.5rem 0 0 0; font-size: 13px;">市场洞察小程序 v1.2.0 - 让数据分析更简单</p>
+        <p style="margin: 0.5rem 0 0 0; font-size: 13px;">市场洞察小程序 - 让数据分析更简单</p>
     </div>
     """, unsafe_allow_html=True)
 
