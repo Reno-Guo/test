@@ -111,7 +111,7 @@ def process_zip_files(uploaded_file, header_row: int):
         return result
 
 def sales_data_merge_app():
-    render_app_header("🔗 销售数据合并工具", "合并月度收入、单位数据与ASIN详细信息（含预览）")
+    render_app_header("🔗 销售数据合并工具", "合并月度收入、单位数据与ASIN详细信息（列顺序优化）")
     
     st.markdown("### 📥 上传数据文件")
     col1, col2, col3 = st.columns(3)
@@ -189,6 +189,23 @@ def sales_data_merge_app():
             # 与ASIN详情合并，使用ASIN和Product关联
             final = asin_df.merge(combined, left_on='ASIN', right_on='Product', how='inner')
             
+            # 重新排列列顺序：先ASIN详情列，然后新增的列
+            original_asin_cols = [col for col in asin_df.columns if col != 'Product']
+            new_cols = [col for col in final.columns if col not in original_asin_cols and col != 'Product_y']
+            
+            # 保留ASIN详情的列顺序，然后加上新列
+            ordered_cols = ['Product'] + original_asin_cols + new_cols
+            # 去除重复列名
+            ordered_cols = list(dict.fromkeys(ordered_cols))
+            
+            # 确保所有列都在最终列表中
+            all_cols = set(final.columns)
+            for col in all_cols:
+                if col not in ordered_cols:
+                    ordered_cols.append(col)
+            
+            final = final[ordered_cols]
+            
             # 处理列名冲突：将_x/_y列合并为单一列
             # 如果存在Total Revenue_x和Total Revenue_y，保留_y列作为新的Total Revenue
             if 'Total Revenue_x' in final.columns and 'Total Revenue_y' in final.columns:
@@ -207,6 +224,10 @@ def sales_data_merge_app():
                 # 保留_x列（来自ASIN详情的Product）
                 final['Product'] = final['Product_x']
                 final = final.drop(columns=['Product_x', 'Product_y'])
+            elif 'Product_y' in final.columns:
+                # 如果只有Product_y，使用它
+                final['Product'] = final['Product_y']
+                final = final.drop(columns=['Product_y'])
             
             if final.empty:
                 st.warning("⚠️ 无匹配记录")
