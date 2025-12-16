@@ -150,7 +150,7 @@ def main():
     """, unsafe_allow_html=True)
     st.markdown(f"""
     <div style="background: linear-gradient(135deg, #00a6e4 0%, #0088c2 100%); padding: 2.5rem 2rem; border-radius: 15px; margin-bottom: 2rem; box-shadow: 0 8px 16px rgba(0,0,0,0.15);">
-        <h1 style="color: white; margin: 0; font-size: 2.5rem; font-weight: 700;">📊 市场洞察小程序</h1>
+        <h1 style="color: white; margin: 0; font-size: 2.5rem; font-weight: 700;">📊 Data Cleansing for Market Insights</h1>
         <div style="display: flex; gap: 2rem; margin-top: 1rem; flex-wrap: wrap;">
             <span style="color: rgba(255,255,255,0.95); font-size: 14px;"><strong>版本:</strong> {APP_CONFIG["version"]}</span>
             <span style="color: rgba(255,255,255,0.95); font-size: 14px;"><strong>作者:</strong> {APP_CONFIG["author"]}</span>
