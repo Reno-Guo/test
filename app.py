@@ -22,8 +22,8 @@ from sub_module_pack_form import pack_form_labeler_app
 
 # App configuration
 APP_CONFIG = {
-    "app_title": "市场洞察小程序",
-    "author": "海翼IDC团队",
+    "app_title": "Data Cleansing for Market Insights",
+    "author": "Developed by the IDC Team, Oceanwing",
     "version": "v1.3.0",
     "contact": "idc@oceanwing.com",
     "company": "Anker Oceanwing Inc."
@@ -181,8 +181,8 @@ def main():
     st.divider()
     st.markdown("""
     <div style="text-align: center; color: #666; padding: 2rem 0;">
-        <p style="margin: 0;">© Anker Oceanwing Inc. | 海翼IDC团队</p>
-        <p style="margin: 0.5rem 0 0 0; font-size: 13px;">市场洞察小程序 - 让数据分析更简单</p>
+        <p style="margin: 0;">© Anker Oceanwing Inc. | Developed by the IDC Team, Oceanwing</p>
+        <p style="margin: 0.5rem 0 0 0; font-size: 13px;">Data Cleansing for Market Insights - Making data analysis simpler</p>
     </div>
     """, unsafe_allow_html=True)
 
