@@ -125,16 +125,16 @@ def parse_month_year_to_yyyy_mm(col_name: str) -> str:
         return col_name  # 无效月份名则原样返回
 
 def sales_data_merge_app():
-    render_app_header("🔗 销售数据合并工具", "合并月度收入、单位数据与ASIN详细信息（含标准时间格式）")
+    render_app_header("🔗 销售数据合并工具", "合并Rev.、Units与Prducts")
     
     st.markdown("### 📥 上传数据文件")
     col1, col2, col3 = st.columns(3)
     with col1:
-        rev_zip = st.file_uploader("月度收入ZIP", type=["zip"], key="rev")
+        rev_zip = st.file_uploader("Rev. ZIP", type=["zip"], key="rev")
     with col2:
-        units_zip = st.file_uploader("月度单位ZIP", type=["zip"], key="units")
+        units_zip = st.file_uploader("Units ZIP", type=["zip"], key="units")
     with col3:
-        asin_zip = st.file_uploader("ASIN详情ZIP", type=["zip"], key="asin")
+        asin_zip = st.file_uploader("Products ZIP", type=["zip"], key="asin")
     
     st.divider()
     preview_btn = st.button("🔍 预览各文件内容", use_container_width=True)
@@ -146,9 +146,9 @@ def sales_data_merge_app():
             return
         
         with st.spinner("加载预览中..."):
-            process_zip_files_with_preview(rev_zip, header_row=1, file_type="月度收入")
-            process_zip_files_with_preview(units_zip, header_row=1, file_type="月度单位")
-            process_zip_files_with_preview(asin_zip, header_row=0, file_type="ASIN详情")
+            process_zip_files_with_preview(rev_zip, header_row=1, file_type="Rev.")
+            process_zip_files_with_preview(units_zip, header_row=1, file_type="Units")
+            process_zip_files_with_preview(asin_zip, header_row=0, file_type="Products")
     
     if execute_btn:
         if not all([rev_zip, units_zip, asin_zip]):
@@ -197,7 +197,7 @@ def sales_data_merge_app():
             if not rev_long_df.empty and not units_long_df.empty:
                 combined = rev_long_df.merge(units_long_df, on=['Product', '时间'], how='inner')
             else:
-                st.error("❌ 无有效月度数据")
+                st.error("❌ 无有效数据")
                 return
             
             # 与ASIN详情合并
