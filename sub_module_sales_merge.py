@@ -36,6 +36,46 @@ def csv_to_dataframe(csv_path: str, header_row: int = 0) -> pd.DataFrame:
 def excel_to_dataframe(excel_path: str, header_row: int = 0) -> pd.DataFrame:
     return pd.read_excel(excel_path, header=header_row)
 
+def process_zip_files_with_preview(uploaded_file, header_row: int, file_type: str):
+    if uploaded_file is None:
+        return pd.DataFrame()
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        zip_path = os.path.join(temp_dir, uploaded_file.name)
+        with open(zip_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        
+        with zipfile.ZipFile(zip_path, "r") as z:
+            z.extractall(temp_dir)
+        
+        files = [f for f in os.listdir(temp_dir) if f.lower().endswith(('.csv', '.xlsx', '.xls'))]
+        if not files:
+            st.warning(f"📂 {file_type}压缩包中未找到有效文件")
+            return pd.DataFrame()
+        
+        dfs = []
+        for f in files:
+            fp = os.path.join(temp_dir, f)
+            try:
+                if f.lower().endswith('.csv'):
+                    df = csv_to_dataframe(fp, header_row=header_row)
+                else:
+                    df = excel_to_dataframe(fp, header_row=header_row)
+                
+                with st.expander(f"📄 {file_type} - {f} 预览"):
+                    st.write(f"**列名:** {list(df.columns)}")
+                    st.write(f"**形状:** {df.shape}")
+                    st.dataframe(df.head(3), use_container_width=True)
+                dfs.append(df.reset_index(drop=True))
+            except Exception as e:
+                st.error(f"❌ 处理 {f} 失败: {str(e)[:100]}...")
+        
+        if not dfs:
+            return pd.DataFrame()
+        
+        result = pd.concat(dfs, ignore_index=True, sort=False)
+        return result
+
 def process_zip_files(uploaded_file, header_row: int):
     if uploaded_file is None:
         return pd.DataFrame()
@@ -71,7 +111,7 @@ def process_zip_files(uploaded_file, header_row: int):
         return result
 
 def sales_data_merge_app():
-    render_app_header("🔗 销售数据合并工具", "合并月度收入、单位数据与ASIN详细信息")
+    render_app_header("🔗 销售数据合并工具", "合并月度收入、单位数据与ASIN详细信息（含预览）")
     
     st.markdown("### 📥 上传数据文件")
     col1, col2, col3 = st.columns(3)
@@ -82,7 +122,19 @@ def sales_data_merge_app():
     with col3:
         asin_zip = st.file_uploader("ASIN详情ZIP", type=["zip"], key="asin")
     
+    st.divider()
+    preview_btn = st.button("🔍 预览各文件内容", use_container_width=True)
     execute_btn = st.button("🚀 开始合并数据", use_container_width=True)
+    
+    if preview_btn:
+        if not all([rev_zip, units_zip, asin_zip]):
+            st.warning("⚠️ 请先上传全部三个文件")
+            return
+        
+        with st.spinner("加载预览中..."):
+            process_zip_files_with_preview(rev_zip, header_row=1, file_type="月度收入")
+            process_zip_files_with_preview(units_zip, header_row=1, file_type="月度单位")
+            process_zip_files_with_preview(asin_zip, header_row=0, file_type="ASIN详情")
     
     if execute_btn:
         if not all([rev_zip, units_zip, asin_zip]):
@@ -105,7 +157,7 @@ def sales_data_merge_app():
             for col in month_cols:
                 temp = rev_df[['Product', col]].dropna(subset=[col]).copy()
                 temp.columns = ['Product', 'Total Revenue']
-                time_val = col.replace(' ', '-').replace(',', '')  # 简化时间处理
+                time_val = col.replace(' ', '-').replace(',', '')
                 temp['时间'] = time_val
                 rev_long_list.append(temp.reset_index(drop=True))
             
@@ -137,14 +189,24 @@ def sales_data_merge_app():
             # 与ASIN详情合并，使用ASIN和Product关联
             final = asin_df.merge(combined, left_on='ASIN', right_on='Product', how='inner')
             
-            # 重命名列以消除_x/_y后缀
-            if 'Total Revenue_x' in final.columns:
-                final = final.rename(columns={
-                    'Total Revenue_x': 'Total Revenue',
-                    'Unit Sales_x': 'Unit Sales'
-                })
-                final = final.drop(columns=['Total Revenue_y', 'Unit Sales_y', 'Product_y'])
-                final = final.rename(columns={'Product_x': 'Product'})
+            # 处理列名冲突：将_x/_y列合并为单一列
+            # 如果存在Total Revenue_x和Total Revenue_y，保留_y列作为新的Total Revenue
+            if 'Total Revenue_x' in final.columns and 'Total Revenue_y' in final.columns:
+                # 优先使用_y列（来自合并数据的值）
+                final['Total Revenue'] = final['Total Revenue_y']
+                final = final.drop(columns=['Total Revenue_x', 'Total Revenue_y'])
+            
+            # 如果存在Unit Sales_x和Unit Sales_y，保留_y列作为新的Unit Sales
+            if 'Unit Sales_x' in final.columns and 'Unit Sales_y' in final.columns:
+                # 优先使用_y列（来自合并数据的值）
+                final['Unit Sales'] = final['Unit Sales_y']
+                final = final.drop(columns=['Unit Sales_x', 'Unit Sales_y'])
+            
+            # 处理Product列冲突
+            if 'Product_x' in final.columns and 'Product_y' in final.columns:
+                # 保留_x列（来自ASIN详情的Product）
+                final['Product'] = final['Product_x']
+                final = final.drop(columns=['Product_x', 'Product_y'])
             
             if final.empty:
                 st.warning("⚠️ 无匹配记录")
