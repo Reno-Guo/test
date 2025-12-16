@@ -5,6 +5,7 @@ from datetime import datetime
 import io
 import zipfile
 import tempfile
+import calendar
 
 def save_df_to_buffer(df: pd.DataFrame) -> io.BytesIO:
     buffer = io.BytesIO()
@@ -110,8 +111,21 @@ def process_zip_files(uploaded_file, header_row: int):
         result = pd.concat(dfs, ignore_index=True, sort=False)
         return result
 
+def parse_month_year_to_yyyy_mm(col_name: str) -> str:
+    """将 'December 2023' 或 'December-2023' 转为 '2023-12'"""
+    clean = col_name.replace(',', '').replace('-', ' ').strip()
+    parts = clean.split()
+    if len(parts) < 2:
+        return col_name  # 无法解析则原样返回
+    month_name, year_str = parts[0], parts[1]
+    try:
+        month_num = list(calendar.month_name).index(month_name.capitalize())
+        return f"{year_str}-{month_num:02d}"
+    except ValueError:
+        return col_name  # 无效月份名则原样返回
+
 def sales_data_merge_app():
-    render_app_header("🔗 销售数据合并工具", "合并月度收入、单位数据与ASIN详细信息（列顺序已优化）")
+    render_app_header("🔗 销售数据合并工具", "合并月度收入、单位数据与ASIN详细信息（含标准时间格式）")
     
     st.markdown("### 📥 上传数据文件")
     col1, col2, col3 = st.columns(3)
@@ -157,7 +171,7 @@ def sales_data_merge_app():
             for col in month_cols:
                 temp = rev_df[['Product', col]].dropna(subset=[col]).copy()
                 temp.columns = ['Product', 'Total Revenue']
-                time_val = col.replace(' ', '-').replace(',', '')
+                time_val = parse_month_year_to_yyyy_mm(col)
                 temp['时间'] = time_val
                 rev_long_list.append(temp.reset_index(drop=True))
             
@@ -170,7 +184,7 @@ def sales_data_merge_app():
             for col in month_cols:
                 temp = units_df[['Product', col]].dropna(subset=[col]).copy()
                 temp.columns = ['Product', 'Unit Sales']
-                time_val = col.replace(' ', '-').replace(',', '')
+                time_val = parse_month_year_to_yyyy_mm(col)
                 temp['时间'] = time_val
                 units_long_list.append(temp.reset_index(drop=True))
             
@@ -189,7 +203,7 @@ def sales_data_merge_app():
             # 与ASIN详情合并
             final = asin_df.merge(combined, left_on='ASIN', right_on='Product', how='inner')
             
-            # === 第一步：清理 _x / _y 列 ===
+            # === 清理 _x / _y 列 ===
             if 'Total Revenue_x' in final.columns and 'Total Revenue_y' in final.columns:
                 final['Total Revenue'] = final['Total Revenue_y']
                 final = final.drop(columns=['Total Revenue_x', 'Total Revenue_y'])
@@ -214,7 +228,7 @@ def sales_data_merge_app():
             elif 'Product_x' in final.columns:
                 final = final.rename(columns={'Product_x': 'Product'})
 
-            # === 第二步：按指定顺序重排列 ===
+            # === 按指定顺序重排列 ===
             desired_order = [
                 'Product', 'ASIN', 'Brand', 'Price', 'BSR', 'Number of sellers', 'Fulfillment',
                 'FBA fees (USD)', 'Ratings', 'Review count', 'Images', 'Buy Box', 'Category',
@@ -224,7 +238,6 @@ def sales_data_merge_app():
                 'Manufacturer', 'Unit Sales', 'Unit Sales Actuals', 'Total Revenue', 'Total Revenue Actuals', '时间'
             ]
             
-            # 保留存在的列，并补充可能新增的其他列（如意外多出的）
             existing_cols = [col for col in desired_order if col in final.columns]
             extra_cols = [col for col in final.columns if col not in desired_order]
             final = final[existing_cols + extra_cols]
