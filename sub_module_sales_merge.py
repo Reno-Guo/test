@@ -111,7 +111,7 @@ def process_zip_files(uploaded_file, header_row: int):
         return result
 
 def sales_data_merge_app():
-    render_app_header("🔗 销售数据合并工具", "合并月度收入、单位数据与ASIN详细信息（列顺序优化）")
+    render_app_header("🔗 销售数据合并工具", "合并月度收入、单位数据与ASIN详细信息（列顺序已优化）")
     
     st.markdown("### 📥 上传数据文件")
     col1, col2, col3 = st.columns(3)
@@ -186,48 +186,48 @@ def sales_data_merge_app():
                 st.error("❌ 无有效月度数据")
                 return
             
-            # 与ASIN详情合并，使用ASIN和Product关联
+            # 与ASIN详情合并
             final = asin_df.merge(combined, left_on='ASIN', right_on='Product', how='inner')
             
-            # 重新排列列顺序：先ASIN详情列，然后新增的列
-            original_asin_cols = [col for col in asin_df.columns if col != 'Product']
-            new_cols = [col for col in final.columns if col not in original_asin_cols and col != 'Product_y']
-            
-            # 保留ASIN详情的列顺序，然后加上新列
-            ordered_cols = ['Product'] + original_asin_cols + new_cols
-            # 去除重复列名
-            ordered_cols = list(dict.fromkeys(ordered_cols))
-            
-            # 确保所有列都在最终列表中
-            all_cols = set(final.columns)
-            for col in all_cols:
-                if col not in ordered_cols:
-                    ordered_cols.append(col)
-            
-            final = final[ordered_cols]
-            
-            # 处理列名冲突：将_x/_y列合并为单一列
-            # 如果存在Total Revenue_x和Total Revenue_y，保留_y列作为新的Total Revenue
+            # === 第一步：清理 _x / _y 列 ===
             if 'Total Revenue_x' in final.columns and 'Total Revenue_y' in final.columns:
-                # 优先使用_y列（来自合并数据的值）
                 final['Total Revenue'] = final['Total Revenue_y']
                 final = final.drop(columns=['Total Revenue_x', 'Total Revenue_y'])
-            
-            # 如果存在Unit Sales_x和Unit Sales_y，保留_y列作为新的Unit Sales
+            elif 'Total Revenue_y' in final.columns:
+                final = final.rename(columns={'Total Revenue_y': 'Total Revenue'})
+            elif 'Total Revenue_x' in final.columns:
+                final = final.rename(columns={'Total Revenue_x': 'Total Revenue'})
+
             if 'Unit Sales_x' in final.columns and 'Unit Sales_y' in final.columns:
-                # 优先使用_y列（来自合并数据的值）
                 final['Unit Sales'] = final['Unit Sales_y']
                 final = final.drop(columns=['Unit Sales_x', 'Unit Sales_y'])
-            
-            # 处理Product列冲突
+            elif 'Unit Sales_y' in final.columns:
+                final = final.rename(columns={'Unit Sales_y': 'Unit Sales'})
+            elif 'Unit Sales_x' in final.columns:
+                final = final.rename(columns={'Unit Sales_x': 'Unit Sales'})
+
             if 'Product_x' in final.columns and 'Product_y' in final.columns:
-                # 保留_x列（来自ASIN详情的Product）
                 final['Product'] = final['Product_x']
                 final = final.drop(columns=['Product_x', 'Product_y'])
             elif 'Product_y' in final.columns:
-                # 如果只有Product_y，使用它
-                final['Product'] = final['Product_y']
-                final = final.drop(columns=['Product_y'])
+                final = final.rename(columns={'Product_y': 'Product'})
+            elif 'Product_x' in final.columns:
+                final = final.rename(columns={'Product_x': 'Product'})
+
+            # === 第二步：按指定顺序重排列 ===
+            desired_order = [
+                'Product', 'ASIN', 'Brand', 'Price', 'BSR', 'Number of sellers', 'Fulfillment',
+                'FBA fees (USD)', 'Ratings', 'Review count', 'Images', 'Buy Box', 'Category',
+                'Subcategory', 'Size tier', 'Dimensions', 'Weight', 'Creation date', 'Variation count',
+                'Net price', 'Sales trend (90 days)', 'Price trend (90 days)', 'Best sales period',
+                'Sales to reviews', 'Parent ASIN', 'Price per unit', 'Unit count', 'Pack form',
+                'Manufacturer', 'Unit Sales', 'Unit Sales Actuals', 'Total Revenue', 'Total Revenue Actuals', '时间'
+            ]
+            
+            # 保留存在的列，并补充可能新增的其他列（如意外多出的）
+            existing_cols = [col for col in desired_order if col in final.columns]
+            extra_cols = [col for col in final.columns if col not in desired_order]
+            final = final[existing_cols + extra_cols]
             
             if final.empty:
                 st.warning("⚠️ 无匹配记录")
