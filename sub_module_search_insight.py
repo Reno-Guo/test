@@ -19,7 +19,7 @@ def _read_excel_cached(file_or_path, sheet_name=0, engine=None):
 def unique_tmp_path(suggest_name: str, default_ext: str = ".xlsx") -> str:
     base, ext = os.path.splitext(suggest_name or f"result{default_ext}")
     ext = ext or default_ext
-    return os.path.join("/tmp", f"{base}_{st.session_state.SID}_{uuid4().hex[:8]}{ext}")
+    return os.path.join("/tmp", f"{base}_{st.session_state.get('SID', 'default')}_{uuid4().hex[:8]}{ext}")
 
 def save_workbook_to_buffer(wb: Workbook) -> io.BytesIO:
     buffer = io.BytesIO()
@@ -127,39 +127,50 @@ def analyze_search_rows(df: pd.DataFrame, params: List[tuple]):
 
 def search_insight_app():
     render_app_header("🔍 SI - 搜索流量洞察", "分析搜索关键词，识别品牌词与非品牌词")
-    st.markdown("#### 📋 步骤 1: 下载数据模板")
-    tmpl = pd.DataFrame(columns=["搜索词", "搜索量", "品牌名称"])
-    buf = io.BytesIO()
-    tmpl.to_excel(buf, index=False)
-    buf.seek(0)
-    st.download_button(
-        "📥 下载Excel模板",
-        buf,
-        "template.xlsx",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        key="download_template",
-        use_container_width=True,
-    )
-    st.divider()
-    st.markdown("#### 📤 步骤 2: 上传填写好的数据文件")
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        uploaded_file = st.file_uploader("选择数据文件", type=["xlsx", "xls"], key="data_file")
-    with col2:
-        save_filename = st.text_input("输出文件名", "search_insight_result.xlsx", key="save_folder")
-    st.divider()
-    st.markdown("#### ⚙️ 步骤 3: 输入产品参数(可选)")
-    col1, col2 = st.columns(2)
-    with col1:
-        param_names = st.text_input("参数名(用逗号分隔)", placeholder="例如: 颜色,尺寸,材质", key="param_names")
-    with col2:
-        param_values = st.text_area(
-            "具体参数(每行一个参数组,用逗号分隔)",
-            placeholder="例如:\n红,蓝,绿\n小,中,大",
-            key="param_values",
-            height=100,
+    
+    # 使用容器来确保步骤标题正确显示
+    with st.container():
+        st.markdown("### 📋 步骤 1: 下载数据模板")
+        tmpl = pd.DataFrame(columns=["搜索词", "搜索量", "品牌名称"])
+        buf = io.BytesIO()
+        tmpl.to_excel(buf, index=False)
+        buf.seek(0)
+        st.download_button(
+            "📥 下载Excel模板",
+            buf,
+            "template.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="download_template",
+            use_container_width=True,
         )
+    
     st.divider()
+    
+    with st.container():
+        st.markdown("### 📤 步骤 2: 上传填写好的数据文件")
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            uploaded_file = st.file_uploader("选择数据文件", type=["xlsx", "xls"], key="data_file")
+        with col2:
+            save_filename = st.text_input("输出文件名", "search_insight_result.xlsx", key="save_folder")
+    
+    st.divider()
+    
+    with st.container():
+        st.markdown("### ⚙️ 步骤 3: 输入产品参数(可选)")
+        col1, col2 = st.columns(2)
+        with col1:
+            param_names = st.text_input("参数名(用逗号分隔)", placeholder="例如: 颜色,尺寸,材质", key="param_names")
+        with col2:
+            param_values = st.text_area(
+                "具体参数(每行一个参数组,用逗号分隔)",
+                placeholder="例如:\n红,蓝,绿\n小,中,大",
+                key="param_values",
+                height=100,
+            )
+    
+    st.divider()
+    
     execute_btn = st.button("🚀 开始分析", key="execute_button", use_container_width=True)
     if execute_btn:
         if not uploaded_file or not save_filename:
@@ -213,3 +224,6 @@ def search_insight_app():
                 save_func=save_func,
                 save_path=out_path,
             )
+
+if __name__ == "__main__":
+    search_insight_app()
