@@ -13,12 +13,41 @@ from uuid import uuid4
 from typing import Callable, List, Any, Dict
 
 # 导入子程序模块
-from sub_module_sales_merge import sales_data_merge_app
-from sub_module_merge import merge_data_app
-from sub_module_search_insight import search_insight_app
-from sub_module_visualization import search_insight_viz_app
-from sub_module_data_clean import data_clean_app
-from sub_module_pack_form import pack_form_labeler_app
+try:
+    from sub_module_sales_merge import sales_data_merge_app
+except ImportError:
+    def sales_data_merge_app():
+        st.error("模块 'sub_module_sales_merge' 未找到")
+
+try:
+    from sub_module_merge import merge_data_app
+except ImportError:
+    def merge_data_app():
+        st.error("模块 'sub_module_merge' 未找到")
+
+try:
+    from sub_module_search_insight import search_insight_app
+except ImportError:
+    def search_insight_app():
+        st.error("模块 'sub_module_search_insight' 未找到")
+
+try:
+    from sub_module_visualization import search_insight_viz_app
+except ImportError:
+    def search_insight_viz_app():
+        st.error("模块 'sub_module_visualization' 未找到")
+
+try:
+    from sub_module_data_clean import data_clean_app
+except ImportError:
+    def data_clean_app():
+        st.error("模块 'sub_module_data_clean' 未找到")
+
+try:
+    from sub_module_pack_form import pack_form_labeler_app
+except ImportError:
+    def pack_form_labeler_app():
+        st.error("模块 'sub_module_pack_form' 未找到")
 
 # App configuration
 APP_CONFIG = {
@@ -111,7 +140,24 @@ def main():
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         html, body, [class*="css"] {font-family: 'Inter', 'Segoe UI', sans-serif;}
         .main {background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);}
-        h1, h2, h3, h4, h5, h6 {color: #ffffff !important; font-weight: 600 !important;}
+        
+        /* 修复标题显示问题：只在顶部 Banner 区域使用白色标题 */
+        div[style*="linear-gradient(135deg, #00a6e4"] h1,
+        div[style*="linear-gradient(135deg, #00a6e4"] h2,
+        div[style*="linear-gradient(135deg, #00a6e4"] h3,
+        div[style*="linear-gradient(135deg, #00a6e4"] h4,
+        div[style*="linear-gradient(135deg, #00a6e4"] h5,
+        div[style*="linear-gradient(135deg, #00a6e4"] h6 {
+            color: #ffffff !important;
+            font-weight: 600 !important;
+        }
+
+        /* 内容区域的标题使用深色 */
+        .main h1, .main h2, .main h3, .main h4, .main h5, .main h6 {
+            color: #333333 !important;
+            font-weight: 600 !important;
+        }
+        
         .stButton > button {
             background: linear-gradient(135deg, #00a6e4 0%, #0088c2 100%);
             color: white; border: none; border-radius: 8px; padding: 0.6rem 1.5rem;
