@@ -140,18 +140,20 @@ def main():
     if "active_users" not in st.session_state:
         st.session_state.active_users = {}
 
-    # 记录用户进入
     user_id = st.session_state.SID
     st.session_state.active_users[user_id] = datetime.now()
 
-    # 清理超过30分钟不活跃的
     threshold = datetime.now() - timedelta(minutes=30)
-    st.session_state.active_users = {k: v for k, v in st.session_state.active_users.items() if v > threshold}
+    st.session_state.active_users = {
+        uid: timestamp 
+        for uid, timestamp in st.session_state.active_users.items() 
+        if timestamp > threshold
+    }
 
     active_count = len(st.session_state.active_users)
 
-    if active_count > 5:
-        st.warning(f"⚠️ 当前有 {active_count} 位用户正在使用，存在线程冲突风险")
+    if active_count >= 2:
+        st.info(f"👥 当前约有 {active_count} 位用户正在使用工具。")
     
     st.set_page_config(page_title=APP_CONFIG["app_title"], layout="wide", page_icon="📊", initial_sidebar_state="collapsed")
     st.markdown("""
