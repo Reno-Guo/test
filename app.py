@@ -152,7 +152,7 @@ def main():
 
     active_count = len(st.session_state.active_users)
 
-    if active_count >= 2:
+    if active_count >= 1:
         st.info(f"👥 当前约有 {active_count} 位用户正在使用工具。")
     
     st.set_page_config(page_title=APP_CONFIG["app_title"], layout="wide", page_icon="📊", initial_sidebar_state="collapsed")
