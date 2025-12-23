@@ -149,7 +149,7 @@ def main():
     active_count = len(st.session_state.active_users)
 
     if active_count > 5:
-    st.warning(f"⚠️ 当前有 {active_count} 位用户正在使用，存在线程冲突风险")
+        st.warning(f"⚠️ 当前有 {active_count} 位用户正在使用，存在线程冲突风险")
     
     st.set_page_config(page_title=APP_CONFIG["app_title"], layout="wide", page_icon="📊", initial_sidebar_state="collapsed")
     st.markdown("""
