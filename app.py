@@ -11,6 +11,7 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 import plotly.express as px
 from uuid import uuid4
 from typing import Callable, List, Any, Dict
+from datetime import timedelta
 
 # 导入子程序模块
 try:
@@ -135,7 +136,7 @@ def render_download_section(
 
 def main():
     if "active_users" not in st.session_state:
-    st.session_state.active_users = {}
+        st.session_state.active_users = {}
 
     # 记录用户进入
     user_id = st.session_state.SID
