@@ -135,6 +135,8 @@ def render_download_section(
         )
 
 def main():
+    st.set_page_config(page_title=APP_CONFIG["app_title"], layout="wide", page_icon="📊", initial_sidebar_state="collapsed")
+    
     if "active_users" not in st.session_state:
         st.session_state.active_users = {}
 
