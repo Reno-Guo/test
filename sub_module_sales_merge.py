@@ -94,7 +94,7 @@ def process_single_month(rev_files, units_files, asin_df, month_col, temp_dir, i
     return None
 
 def sales_data_merge_app():
-    render_app_header("🔗 销售数据合并工具（分月低内存版）", "逐月处理，内存占用大幅降低")
+    render_app_header("🔗 销售数据合并工具")
     
     # ... 上传控件部分保持不变 ...
     
