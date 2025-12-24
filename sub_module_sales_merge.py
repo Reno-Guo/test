@@ -8,8 +8,48 @@ import tempfile
 import calendar
 from pathlib import Path
 
-# ... (保持原有的 save_df_to_buffer, render_app_header, csv_to_dataframe, 
-# excel_to_dataframe, parse_month_year_to_yyyy_mm 函数不变)
+def save_df_to_buffer(df: pd.DataFrame) -> io.BytesIO:
+    buffer = io.BytesIO()
+    df.to_excel(buffer, index=False, engine="openpyxl")
+    buffer.seek(0)
+    return buffer
+
+def render_app_header(emoji_title: str, subtitle: str):
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #00a6e4 0%, #0088c2 100%); padding: 2rem; border-radius: 10px; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h2 style="color: white; margin: 0; display: flex; align-items: center;">
+            {emoji_title}
+        </h2>
+        <p style="color: rgba(255,255,255,0.9); margin-top: 0.5rem;">{subtitle}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def csv_to_dataframe(csv_path: str, header_row: int = 0) -> pd.DataFrame:
+    encodings = ['utf-8', 'gbk', 'gb2312', 'latin-1', 'cp1252']
+    for encoding in encodings:
+        try:
+            df = pd.read_csv(csv_path, encoding=encoding, header=header_row)
+            return df
+        except (UnicodeDecodeError, pd.errors.ParserError):
+            continue
+    df = pd.read_csv(csv_path, encoding='utf-8', header=header_row, encoding_errors='ignore')
+    return df
+
+def excel_to_dataframe(excel_path: str, header_row: int = 0) -> pd.DataFrame:
+    return pd.read_excel(excel_path, header=header_row)
+
+def parse_month_year_to_yyyy_mm(col_name: str) -> str:
+    """将 'December 2023' 或 'December-2023' 转为 '2023-12'"""
+    clean = col_name.replace(',', '').replace('-', ' ').strip()
+    parts = clean.split()
+    if len(parts) < 2:
+        return col_name  # 无法解析则原样返回
+    month_name, year_str = parts[0], parts[1]
+    try:
+        month_num = list(calendar.month_name).index(month_name.capitalize())
+        return f"{year_str}-{month_num:02d}"
+    except ValueError:
+        return col_name  # 无效月份名则原样返回
 
 def extract_and_get_files(uploaded_zip, temp_dir: str):
     """解压 zip 并返回所有数据文件路径"""
