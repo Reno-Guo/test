@@ -275,6 +275,10 @@ def sales_data_merge_app():
            
             final = optimize_dtypes(final)  # Final optimization
            
+            # 新增步骤：删除 Unit Sales 为 0 的行
+            if 'Unit Sales' in final.columns:
+                final = final[final['Unit Sales'] != 0].reset_index(drop=True)
+           
             if final.empty:
                 st.warning("⚠️ 无匹配记录")
                 return
