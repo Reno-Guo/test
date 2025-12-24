@@ -124,6 +124,89 @@ def parse_month_year_to_yyyy_mm(col_name: str) -> str:
     except ValueError:
         return col_name  # 无效月份名则原样返回
 
+def merge_monthly_data(rev_df, units_df, asin_df, month_cols):
+    """按月份分批处理数据合并，减少内存占用"""
+    desired_order = [
+        'Product', 'ASIN', 'Brand', 'Price', 'BSR', 'Number of sellers', 'Fulfillment',
+        'FBA fees (USD)', 'Ratings', 'Review count', 'Images', 'Buy Box', 'Category',
+        'Subcategory', 'Size tier', 'Dimensions', 'Weight', 'Creation date', 'Variation count',
+        'Net price', 'Sales trend (90 days)', 'Price trend (90 days)', 'Best sales period',
+        'Sales to reviews', 'Parent ASIN', 'Price per unit', 'Unit count', 'Pack form',
+        'Manufacturer', 'Unit Sales', 'Unit Sales Actuals', 'Total Revenue', 'Total Revenue Actuals', '时间'
+    ]
+    
+    # 分批处理月份数据
+    batch_size = 3  # 每次处理3个月的数据
+    results = []
+    
+    for i in range(0, len(month_cols), batch_size):
+        batch_cols = month_cols[i:i+batch_size]
+        batch_results = []
+        
+        for col in batch_cols:
+            # 处理收入数据
+            rev_temp = rev_df[['Product', col]].dropna(subset=[col]).copy()
+            rev_temp.columns = ['Product', 'Total Revenue']
+            time_val = parse_month_year_to_yyyy_mm(col)
+            rev_temp['时间'] = time_val
+            
+            # 处理销售数量数据
+            units_temp = units_df[['Product', col]].dropna(subset=[col]).copy()
+            units_temp.columns = ['Product', 'Unit Sales']
+            units_temp['时间'] = time_val
+            
+            # 合并收入和单位数据
+            combined = rev_temp.merge(units_temp, on=['Product', '时间'], how='inner')
+            
+            # 与ASIN详情合并
+            final_batch = asin_df.merge(combined, left_on='ASIN', right_on='Product', how='inner')
+            
+            # 清理 _x / _y 列
+            if 'Total Revenue_x' in final_batch.columns and 'Total Revenue_y' in final_batch.columns:
+                final_batch['Total Revenue'] = final_batch['Total Revenue_y']
+                final_batch = final_batch.drop(columns=['Total Revenue_x', 'Total Revenue_y'])
+            elif 'Total Revenue_y' in final_batch.columns:
+                final_batch = final_batch.rename(columns={'Total Revenue_y': 'Total Revenue'})
+            elif 'Total Revenue_x' in final_batch.columns:
+                final_batch = final_batch.rename(columns={'Total Revenue_x': 'Total Revenue'})
+
+            if 'Unit Sales_x' in final_batch.columns and 'Unit Sales_y' in final_batch.columns:
+                final_batch['Unit Sales'] = final_batch['Unit Sales_y']
+                final_batch = final_batch.drop(columns=['Unit Sales_x', 'Unit Sales_y'])
+            elif 'Unit Sales_y' in final_batch.columns:
+                final_batch = final_batch.rename(columns={'Unit Sales_y': 'Unit Sales'})
+            elif 'Unit Sales_x' in final_batch.columns:
+                final_batch = final_batch.rename(columns={'Unit Sales_x': 'Unit Sales'})
+
+            if 'Product_x' in final_batch.columns and 'Product_y' in final_batch.columns:
+                final_batch['Product'] = final_batch['Product_x']
+                final_batch = final_batch.drop(columns=['Product_x', 'Product_y'])
+            elif 'Product_y' in final_batch.columns:
+                final_batch = final_batch.rename(columns={'Product_y': 'Product'})
+            elif 'Product_x' in final_batch.columns:
+                final_batch = final_batch.rename(columns={'Product_x': 'Product'})
+
+            # 按指定顺序重排列
+            existing_cols = [col for col in desired_order if col in final_batch.columns]
+            extra_cols = [col for col in final_batch.columns if col not in desired_order]
+            final_batch = final_batch[existing_cols + extra_cols]
+            
+            batch_results.append(final_batch)
+        
+        # 合并当前批次结果
+        if batch_results:
+            batch_concat = pd.concat(batch_results, ignore_index=True)
+            results.append(batch_concat)
+            # 清理当前批次的中间数据
+            del batch_results
+    
+    # 最终合并所有批次
+    if results:
+        final_result = pd.concat(results, ignore_index=True)
+        return final_result
+    else:
+        return pd.DataFrame()
+
 def sales_data_merge_app():
     render_app_header("🔗 销售数据合并工具", "合并Rev.、Units与Prducts")
     
@@ -164,83 +247,11 @@ def sales_data_merge_app():
                 st.error("❌ 某个文件加载失败")
                 return
             
-            # 构建长格式数据
+            # 获取月份列
             month_cols = [col for col in rev_df.columns if col not in ['Product', 'Product Name', 'Brand', 'Total']]
             
-            rev_long_list = []
-            for col in month_cols:
-                temp = rev_df[['Product', col]].dropna(subset=[col]).copy()
-                temp.columns = ['Product', 'Total Revenue']
-                time_val = parse_month_year_to_yyyy_mm(col)
-                temp['时间'] = time_val
-                rev_long_list.append(temp.reset_index(drop=True))
-            
-            if rev_long_list:
-                rev_long_df = pd.concat(rev_long_list, ignore_index=True)
-            else:
-                rev_long_df = pd.DataFrame(columns=['Product', 'Total Revenue', '时间'])
-            
-            units_long_list = []
-            for col in month_cols:
-                temp = units_df[['Product', col]].dropna(subset=[col]).copy()
-                temp.columns = ['Product', 'Unit Sales']
-                time_val = parse_month_year_to_yyyy_mm(col)
-                temp['时间'] = time_val
-                units_long_list.append(temp.reset_index(drop=True))
-            
-            if units_long_list:
-                units_long_df = pd.concat(units_long_list, ignore_index=True)
-            else:
-                units_long_df = pd.DataFrame(columns=['Product', 'Unit Sales', '时间'])
-            
-            # 合并收入和单位数据
-            if not rev_long_df.empty and not units_long_df.empty:
-                combined = rev_long_df.merge(units_long_df, on=['Product', '时间'], how='inner')
-            else:
-                st.error("❌ 无有效数据")
-                return
-            
-            # 与ASIN详情合并
-            final = asin_df.merge(combined, left_on='ASIN', right_on='Product', how='inner')
-            
-            # === 清理 _x / _y 列 ===
-            if 'Total Revenue_x' in final.columns and 'Total Revenue_y' in final.columns:
-                final['Total Revenue'] = final['Total Revenue_y']
-                final = final.drop(columns=['Total Revenue_x', 'Total Revenue_y'])
-            elif 'Total Revenue_y' in final.columns:
-                final = final.rename(columns={'Total Revenue_y': 'Total Revenue'})
-            elif 'Total Revenue_x' in final.columns:
-                final = final.rename(columns={'Total Revenue_x': 'Total Revenue'})
-
-            if 'Unit Sales_x' in final.columns and 'Unit Sales_y' in final.columns:
-                final['Unit Sales'] = final['Unit Sales_y']
-                final = final.drop(columns=['Unit Sales_x', 'Unit Sales_y'])
-            elif 'Unit Sales_y' in final.columns:
-                final = final.rename(columns={'Unit Sales_y': 'Unit Sales'})
-            elif 'Unit Sales_x' in final.columns:
-                final = final.rename(columns={'Unit Sales_x': 'Unit Sales'})
-
-            if 'Product_x' in final.columns and 'Product_y' in final.columns:
-                final['Product'] = final['Product_x']
-                final = final.drop(columns=['Product_x', 'Product_y'])
-            elif 'Product_y' in final.columns:
-                final = final.rename(columns={'Product_y': 'Product'})
-            elif 'Product_x' in final.columns:
-                final = final.rename(columns={'Product_x': 'Product'})
-
-            # === 按指定顺序重排列 ===
-            desired_order = [
-                'Product', 'ASIN', 'Brand', 'Price', 'BSR', 'Number of sellers', 'Fulfillment',
-                'FBA fees (USD)', 'Ratings', 'Review count', 'Images', 'Buy Box', 'Category',
-                'Subcategory', 'Size tier', 'Dimensions', 'Weight', 'Creation date', 'Variation count',
-                'Net price', 'Sales trend (90 days)', 'Price trend (90 days)', 'Best sales period',
-                'Sales to reviews', 'Parent ASIN', 'Price per unit', 'Unit count', 'Pack form',
-                'Manufacturer', 'Unit Sales', 'Unit Sales Actuals', 'Total Revenue', 'Total Revenue Actuals', '时间'
-            ]
-            
-            existing_cols = [col for col in desired_order if col in final.columns]
-            extra_cols = [col for col in final.columns if col not in desired_order]
-            final = final[existing_cols + extra_cols]
+            # 按月份分批处理数据合并
+            final = merge_monthly_data(rev_df, units_df, asin_df, month_cols)
             
             if final.empty:
                 st.warning("⚠️ 无匹配记录")
@@ -260,3 +271,6 @@ def sales_data_merge_app():
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
+
+if __name__ == "__main__":
+    sales_data_merge_app()
