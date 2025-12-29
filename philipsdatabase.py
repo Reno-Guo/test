@@ -10,6 +10,7 @@ from email.header import Header
 import io
 import pytz
 import chardet
+import mysql_client
 
 # ==================== 配置常量 ====================
 BRAND_COLOR = "#00a6e4"
@@ -486,7 +487,8 @@ def perform_upload(table_name, upload_mode, df, uploaded_file, backup_filename):
                     conn.execute(text(f"DELETE FROM {table_name}"))
             
             df.to_sql(table_name, engine, if_exists='append', index=False)
-        
+            mysql_client.to_mysql_data(table_name,upload_mode,df)
+
         beijing_time = datetime.now(BEIJING_TZ)
         operation_type = '覆盖 (Replace)' if upload_mode == 'replace' else '续表 (Append)'
         row_count = len(df)
