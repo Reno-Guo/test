@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from urllib.parse import quote_plus
 
 MYSQL_CONFIG = {
@@ -24,7 +24,7 @@ def get_engine():
     """创建数据库连接"""
     #mysql+pymysql://root:password@localhost:3306/your_database
     password_encoded = quote_plus(MYSQL_CONFIG['password'])
-    connection_string = f"mysql+pymysql://{MYSQL_CONFIG['username']}:{password_encoded}@{MYSQL_CONFIG['host']}:{MYSQL_CONFIG['port']}/{MYSQL_CONFIG['database']}"
+    connection_string = f"mysql+pymysql://{MYSQL_CONFIG['user']}:{password_encoded}@{MYSQL_CONFIG['host']}:{MYSQL_CONFIG['port']}/{MYSQL_CONFIG['database']}"
     return create_engine(connection_string)
 
 # 列名转小写
@@ -34,7 +34,7 @@ def to_mysql_data(table_name,upload_mode,df):
     with engine.connect() as conn:
         if upload_mode == 'replace':
             try:
-                conn.execute(text(f"TRUNCATE TABLE {table_name}"))
+                conn.execute(text(f"DELETE FROM {table_name}"))
             except Exception as truncate_e:
                 conn.execute(text(f"DELETE FROM {table_name}"))
         df.columns = df.columns.str.lower()
