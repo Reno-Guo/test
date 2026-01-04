@@ -45,7 +45,7 @@ def check_password():
     """验证密码"""
     def password_entered():
         st.session_state.password_attempted = True
-        if st.session_state["password"] == "owoneplus2025":
+        if st.session_state["password"] == "owblueland2026":
             st.session_state.authenticated = True
             del st.session_state["password"]
         else:
@@ -85,7 +85,7 @@ def process_files(data_files, match_file):
                 match_set.add(str(row[0]).lower().replace(" ", ""))
         match_wb.close()
         os.unlink(match_file_path)
-        add_log(f"✅ 匹配文件加载完成 (共 {len(match_set)} 个 OnePlus ASIN)")
+        add_log(f"✅ 匹配文件加载完成 (共 {len(match_set)} 个 Blueland ASIN)")
         
         # 创建进度条
         progress_bar = st.progress(0)
@@ -128,7 +128,7 @@ def process_files(data_files, match_file):
                     is_b0_pattern = bool(re.match(r'^b0[0-9a-zA-Z]{8}$', col1))
                     
                     if not is_b0_pattern:
-                        label = "Brand KW" if "oneplus" in col1 else "Non-brand KW"
+                        label = "Brand KW" if "blueland" in col1 else "Non-brand KW"
                     else:
                         label = "Brand PAT" if col1 in match_set else "CMP PAT"
                         if "auto" in col2:
@@ -180,7 +180,7 @@ with st.sidebar:
         st.markdown("**文件类型**: `.xlsx`\n\n**列结构**:\n- 第1列: ASIN 列表（B0开头的10位字符）\n\n用于判断 Brand PAT 和 CMP PAT")
     
     st.markdown("### 🏷️ 标注规则")
-    st.markdown('<div style="font-size: 0.9rem; line-height: 1.8;"><b>关键词类型：</b><br>🔹 <b>Brand KW</b>: 品牌关键词，oneplus相关短语关键词<br>🔹 <b>Non-brand KW</b>: 除了oneplus外所有关键词<br><br><b>ASIN 类型：</b><br>🔹 <b>Brand PAT</b>: OnePlus相关asin<br>🔹 <b>CMP PAT</b>: 竞手Asin（除oneplus相关asin外的所有asin）<br><br><b>自动广告类型：</b><br>🔹 <b>Auto KW</b>: OnePlus相关asin，但是有标记自动广告的<br>🔹 <b>Auto PAT</b>: 竞手Asin，但是有标记自动广告的</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size: 0.9rem; line-height: 1.8;"><b>关键词类型：</b><br>🔹 <b>Brand KW</b>: 品牌关键词，blueland相关短语关键词<br>🔹 <b>Non-brand KW</b>: 除了blueland外所有关键词<br><br><b>ASIN 类型：</b><br>🔹 <b>Brand PAT</b>: blueland相关asin<br>🔹 <b>CMP PAT</b>: 竞手Asin（除blueland相关asin外的所有asin）<br><br><b>自动广告类型：</b><br>🔹 <b>Auto KW</b>: blueland相关asin，但是有标记自动广告的<br>🔹 <b>Auto PAT</b>: 竞手Asin，但是有标记自动广告的</div>', unsafe_allow_html=True)
 
 # 文件上传
 st.markdown("## 📤 文件上传")
