@@ -41,3 +41,4 @@ def to_mysql_data(table_name,upload_mode,df):
         df.to_sql(table_name, engine, if_exists='append', index=False)
 
 
+
