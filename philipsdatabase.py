@@ -1,3 +1,4 @@
+      
 import pandas as pd
 import streamlit as st
 from sqlalchemy import create_engine, text
@@ -45,7 +46,8 @@ TABLES = {
     'ods_category': {'name': '类目数据'},
     'ods_asin_philips': {'name': 'ASIN 基础数据'},
     'SI_keyword_philips': {'name': 'SI 关键词数据'},
-    'ods_goal_vcp': {'name': 'VCP 目标数据'}
+    'ods_goal_vcp': {'name': 'VCP 目标数据'},
+    'ods_asin_sale_goal': {'name': 'sale goal 目标数据'}
 }
 
 # ==================== 自定义样式 ====================
@@ -887,3 +889,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+    
