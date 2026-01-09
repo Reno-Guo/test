@@ -20,7 +20,8 @@ TABLES = {
     'ods_category': 'ods_category',
     'ods_asin_philips': 'ods_asin_philips',
     'SI_keyword_philips': 'ods_si_keyword_philips',
-    'ods_goal_vcp':'ods_goal_vcp'
+    'ods_goal_vcp':'ods_goal_vcp',
+    'ods_asin_sale_goal':'ods_asin_sale_goal'
 }
 def get_engine():
     """创建数据库连接"""
