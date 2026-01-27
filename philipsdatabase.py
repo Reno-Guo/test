@@ -1,4 +1,3 @@
-      
 import pandas as pd
 import streamlit as st
 from sqlalchemy import create_engine, text
@@ -9,10 +8,12 @@ import smtplib
 from email.mime.text import MIMEText
 from email.header import Header
 import io
+import os
 import pytz
 import chardet
 import mysql_client
-
+import postgre_client
+import table_columns_config
 # ==================== 配置常量 ====================
 BRAND_COLOR = "#00a6e4"
 SECONDARY_COLOR = "#0088c7"
@@ -44,10 +45,11 @@ EMAIL_CONFIG = {
 TABLES = {
     'ASIN_goal_philips': {'name': 'ASIN 目标数据'},
     'ods_category': {'name': '类目数据'},
-    'ods_asin_philips': {'name': 'ASIN 基础数据'},
+    'ods_asin_philips': {'name': 'Search term打标表'},
     'SI_keyword_philips': {'name': 'SI 关键词数据'},
-    'ods_goal_vcp': {'name': 'VCP 目标数据'},
-    'ods_asin_sale_goal': {'name': 'sale goal 目标数据'}
+    'ods_goal_vcp': {'name': 'Media Plan Goal'},
+    'ods_asin_sale_goal': {'name': 'Annual Goal ASIN Level'},
+    'ods_date_event': {'name': 'ods_date_event'},
 }
 
 # ==================== 自定义样式 ====================
@@ -423,19 +425,30 @@ def generate_code():
 def export_table(table_name, mode='full', filename=None):
     """通用导出函数：支持全表/备份（CSV）或模板（XLSX）"""
     try:
+        # 特殊处理 ods_goal_vcp 表的模板下载
+        if mode == 'columns' and 'ods_goal_vcp' in table_name:
+            template_path = 'temp/ods_goal_vcp.xlsx'
+
+            if os.path.exists(template_path):
+                with open(template_path, 'rb') as f:
+                    buffer = io.BytesIO(f.read())
+                buffer.seek(0)
+                return buffer, f'{table_name}_template.xlsx', None, None
+
         engine = get_engine()
         if not table_exists(engine, table_name, DB_CONFIG['database']):
             return None, f'表 {table_name} 不存在。'
         
         if mode == 'columns':
-            query = text(f"SELECT name FROM system.columns WHERE table = '{table_name}' AND database = '{DB_CONFIG['database']}' ORDER BY position")
-            with engine.connect() as conn:
-                df_columns = pd.read_sql(query, conn)
-            
-            if df_columns.empty:
-                return None, '未找到列信息。'
-            
-            column_names = df_columns['name'].tolist()
+            column_names = table_columns_config.get_file_columns_config(table_name)
+            if column_names==[]:
+                query = text(f"SELECT name FROM system.columns WHERE table = '{table_name}' AND database = '{DB_CONFIG['database']}' ORDER BY position")
+                with engine.connect() as conn:
+                    df_columns = pd.read_sql(query, conn)
+
+                if df_columns.empty:
+                    return None, '未找到列信息。'
+                column_names = df_columns['name'].tolist()
             df = pd.DataFrame(columns=column_names)
             output_buffer = io.BytesIO()
             with pd.ExcelWriter(output_buffer, engine='openpyxl') as writer:
@@ -490,6 +503,7 @@ def perform_upload(table_name, upload_mode, df, uploaded_file, backup_filename):
             
             df.to_sql(table_name, engine, if_exists='append', index=False)
             mysql_client.to_mysql_data(table_name,upload_mode,df)
+            postgre_client.to_postgresql_data(table_name,upload_mode,df)
 
         beijing_time = datetime.now(BEIJING_TZ)
         operation_type = '覆盖 (Replace)' if upload_mode == 'replace' else '续表 (Append)'
@@ -609,6 +623,8 @@ def upload_data(table_name, upload_mode, uploaded_file):
         
         if df.empty:
             return '❌ 文件内容为空，没有数据行'
+
+        df=table_columns_config.get_table_columns_config(table_name,df)
         
         st.success(f'✅ 文件读取成功！数据维度: **{len(df)}** 行 × **{len(df.columns)}** 列')
         
@@ -674,15 +690,34 @@ def render_table_selector():
     """渲染表选择器"""
     st.markdown('<div class="section-title"><span class="icon">📊</span>选择数据表</div>', unsafe_allow_html=True)
     
-    table_options = list(TABLES.keys())
-    current_index = table_options.index(st.session_state.selected_table) if st.session_state.selected_table in table_options else 0
-    
-    selected_table = st.selectbox('选择要操作的数据表:', options=table_options, index=current_index, key='table_selector')
-    
+    table_options = [(table_name, TABLES[table_name]['name']) for table_name in TABLES.keys()]
+    current_index = 0
+    for i, (table_name, _) in enumerate(table_options):
+        if table_name == st.session_state.selected_table:
+            current_index = i
+            break
+
+    # 创建显示选项，格式为 "显示名称 (表名)"
+    display_options = [f"{display_name} ({table_name})" for table_name, display_name in table_options]
+
+    # 获取当前选择的显示文本
+    current_display = f"{TABLES[st.session_state.selected_table]['name']} ({st.session_state.selected_table})"
+    current_display_index = 0
+    for i, option in enumerate(display_options):
+        if option == current_display:
+            current_display_index = i
+            break
+
+    selected_display = st.selectbox('选择要操作的数据表:', options=display_options, index=current_display_index,
+                                    key='table_selector')
+
+    # 从显示文本中提取实际的表名
+    selected_table = selected_display.split('(')[-1].split(')')[0]  # 提取括号内的表名
+
     if selected_table != st.session_state.selected_table:
         st.session_state.selected_table = selected_table
         st.rerun()
-    
+
     render_divider()
     return selected_table
 
@@ -744,7 +779,8 @@ def render_main_ui():
         engine = get_engine()
         db_columns = get_table_columns(engine, table_name, DB_CONFIG['database'])
         if db_columns:
-            st.info(f"表 **{table_name}** 包含 {len(db_columns)} 个字段:")
+            table_display_name = TABLES[table_name]['name']
+            st.info(f"表 **{table_name}** ({table_display_name}) 包含 {len(db_columns)} 个字段:")
             cols = st.columns(3)
             for idx, col in enumerate(db_columns):
                 cols[idx % 3].markdown(f"• `{col}`")
@@ -882,12 +918,10 @@ def main():
     
     render_divider()
     
-    if not st.session_state.captcha_verified:
-        render_captcha_ui()
-    else:
-        render_main_ui()
-
+    # if not st.session_state.captcha_verified:
+    #     render_captcha_ui()
+    # else:
+    #     render_main_ui()
+    render_main_ui()
 if __name__ == '__main__':
     main()
-
-    
