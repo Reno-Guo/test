@@ -1,4 +1,3 @@
-      
 from sqlalchemy import create_engine, text
 from urllib.parse import quote_plus
 import pandas as pd
@@ -21,7 +20,8 @@ TABLES = {
     'ods_asin_philips': 'ods_asin_philips',
     'SI_keyword_philips': 'ods_si_keyword_philips',
     'ods_goal_vcp':'ods_goal_vcp',
-    'ods_asin_sale_goal':'ods_asin_sale_goal'
+    'ods_asin_sale_goal':'ods_asin_sale_goal',
+    'ods_date_event': 'ods_date_even',
 }
 def get_engine():
     """创建数据库连接"""
@@ -31,7 +31,7 @@ def get_engine():
     return create_engine(connection_string)
 
 # 列名转小写
-def to_mysql_data(table_name, upload_mode, df, batch_size=100):
+def to_mysql_data(table_name, upload_mode, df, batch_size=1000):
     """优化的分批插入版本"""
     try:
         to_mysql_data_safe(table_name, upload_mode, df)
@@ -148,5 +148,3 @@ def to_mysql_data_safe(table_name, upload_mode, df):
 
     print(f"🎉 数据上传完成，共插入 {total_rows} 行")
     return True
-
-    
