@@ -1,3 +1,4 @@
+      
 import pandas as pd
 import streamlit as st
 from sqlalchemy import create_engine, text
@@ -50,6 +51,7 @@ TABLES = {
     'ods_goal_vcp': {'name': 'Media Plan Goal'},
     'ods_asin_sale_goal': {'name': 'Annual Goal ASIN Level'},
     'ods_date_event': {'name': 'ods_date_event'},
+    'ods_category_dsp': {'name': 'ods_category_dsp'},
 }
 
 # ==================== 自定义样式 ====================
@@ -436,8 +438,9 @@ def export_table(table_name, mode='full', filename=None):
                 return buffer, f'{table_name}_template.xlsx', None, None
 
         engine = get_engine()
-        if not table_exists(engine, table_name, DB_CONFIG['database']):
-            return None, f'表 {table_name} 不存在。'
+        if 'ods_category_dsp' not in table_name:
+            if not table_exists(engine, table_name, DB_CONFIG['database']):
+                return None, f'表 {table_name} 不存在。'
         
         if mode == 'columns':
             column_names = table_columns_config.get_file_columns_config(table_name)
@@ -455,11 +458,16 @@ def export_table(table_name, mode='full', filename=None):
                 df.to_excel(writer, index=False)
             output_buffer.seek(0)
             return output_buffer, f'{table_name}_template.xlsx', None, None
-        
+
+
         # 全表或备份模式
         query = text(f"SELECT * FROM {table_name}")
-        with engine.connect() as conn:
-            df = pd.read_sql(query, conn)
+        if 'ods_category_dsp' in table_name:
+            with postgre_client.get_engine().begin() as conn:
+                df=pd.read_sql(query, conn)
+        else:
+            with engine.connect() as conn:
+                df = pd.read_sql(query, conn)
         
         if df.empty:
             return None, None, None, '表为空,无数据导出。'
@@ -481,29 +489,34 @@ def export_table(table_name, mode='full', filename=None):
 def perform_upload(table_name, upload_mode, df, uploaded_file, backup_filename):
     """执行上传逻辑"""
     try:
-        engine = get_engine()
-        
-        if not table_exists(engine, table_name, DB_CONFIG['database']):
-            return f'表 {table_name} 不存在。请先重建表。'
-        
-        if not test_insert_permission(engine, table_name, DB_CONFIG['database']):
-            grant_sql = f"GRANT INSERT ON {DB_CONFIG['database']}.{table_name} TO {DB_CONFIG['username']};"
-            if upload_mode == 'replace':
-                grant_sql += f"\nGRANT TRUNCATE ON {DB_CONFIG['database']}.{table_name} TO {DB_CONFIG['username']};"
-            return f'权限不足。请联系管理员执行:\n{grant_sql}'
-        
-        with engine.connect() as conn:
-            if upload_mode == 'replace':
-                try:
-                    conn.execute(text(f"TRUNCATE TABLE {table_name}"))
-                    st.info(f"✓ 表 {table_name} 已清空。")
-                except Exception as truncate_e:
-                    st.warning(f'TRUNCATE 失败: {str(truncate_e)}\n使用 DELETE 清空。')
-                    conn.execute(text(f"DELETE FROM {table_name}"))
-            
-            df.to_sql(table_name, engine, if_exists='append', index=False)
-            mysql_client.to_mysql_data(table_name,upload_mode,df)
-            postgre_client.to_postgresql_data(table_name,upload_mode,df)
+        if 'ods_category_dsp' in table_name:
+            print(df)
+            postgre_client.to_postgresql_data(table_name, upload_mode, df)
+        else:
+            engine = get_engine()
+
+            if not table_exists(engine, table_name, DB_CONFIG['database']):
+                return f'表 {table_name} 不存在。请先重建表。'
+
+            if not test_insert_permission(engine, table_name, DB_CONFIG['database']):
+                grant_sql = f"GRANT INSERT ON {DB_CONFIG['database']}.{table_name} TO {DB_CONFIG['username']};"
+                if upload_mode == 'replace':
+                    grant_sql += f"\nGRANT TRUNCATE ON {DB_CONFIG['database']}.{table_name} TO {DB_CONFIG['username']};"
+                return f'权限不足。请联系管理员执行:\n{grant_sql}'
+
+
+            with engine.connect() as conn:
+                if upload_mode == 'replace':
+                    try:
+                        conn.execute(text(f"TRUNCATE TABLE {table_name}"))
+                        st.info(f"✓ 表 {table_name} 已清空。")
+                    except Exception as truncate_e:
+                        st.warning(f'TRUNCATE 失败: {str(truncate_e)}\n使用 DELETE 清空。')
+                        conn.execute(text(f"DELETE FROM {table_name}"))
+
+                df.to_sql(table_name, engine, if_exists='append', index=False)
+                mysql_client.to_mysql_data(table_name,upload_mode,df)
+                postgre_client.to_postgresql_data(table_name,upload_mode,df)
 
         beijing_time = datetime.now(BEIJING_TZ)
         operation_type = '覆盖 (Replace)' if upload_mode == 'replace' else '续表 (Append)'
@@ -633,19 +646,25 @@ def upload_data(table_name, upload_mode, uploaded_file):
         st.info(f'📋 列名预览: {preview}')
         
         st.info('🧹 正在清洗数据...')
-        df = clean_data(df, table_name, DB_CONFIG['database'])
+        if 'ods_category_dsp' not in table_name:
+            df = clean_data(df, table_name, DB_CONFIG['database'])
         
         if df.empty:
             return '❌ 数据清洗后为空，可能所有数据都是无效的'
         
         st.info('🔍 正在验证表结构...')
-        engine = get_engine()
-        db_columns = get_table_columns(engine, table_name, DB_CONFIG['database'])
+        db_columns= []
+        if 'ods_category_dsp' in table_name:
+            db_columns = postgre_client.get_table_columns( table_name, DB_CONFIG['database'])
+        else:
+            engine = get_engine()
+            db_columns = get_table_columns(engine, table_name, DB_CONFIG['database'])
         
         if not db_columns:
             return f'❌ 无法获取表 {table_name} 的结构信息\n\n请检查:\n1. 表是否存在\n2. 数据库连接是否正常\n3. 是否有查询权限'
         
         file_columns = df.columns.tolist()
+
         invalid_cols = [col for col in file_columns if col not in db_columns]
         
         if invalid_cols:
@@ -918,10 +937,13 @@ def main():
     
     render_divider()
     
-    # if not st.session_state.captcha_verified:
-    #     render_captcha_ui()
-    # else:
-    #     render_main_ui()
-    render_main_ui()
+    if not st.session_state.captcha_verified:
+        render_captcha_ui()
+    else:
+        render_main_ui()
+    # render_main_ui()
 if __name__ == '__main__':
     main()
+    #streamlit run philipsdatabase2.py
+
+    
