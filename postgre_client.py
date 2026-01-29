@@ -1,3 +1,4 @@
+      
 import psycopg2
 from sqlalchemy import create_engine, text, MetaData, Table
 from urllib.parse import quote_plus
@@ -22,6 +23,7 @@ TABLES = {
     'ods_goal_vcp': 'ods_goal_vcp',
     'ods_asin_sale_goal': 'ods_asin_sale_goal',
     'ods_date_event': 'ods_date_even',
+    'ods_category_dsp': 'ods_category_dsp',
 }
 
 def get_engine():
@@ -29,6 +31,20 @@ def get_engine():
     password_encoded = quote_plus(POSTGRES_CONFIG['password'])
     connection_string = f"postgresql+psycopg2://{POSTGRES_CONFIG['user']}:{password_encoded}@{POSTGRES_CONFIG['host']}:{POSTGRES_CONFIG['port']}/{POSTGRES_CONFIG['database']}"
     return create_engine(connection_string)
+
+def get_table_columns( table_name, database):
+    """获取数据库表的列名"""
+    try:
+        query = text(f"""SELECT column_name name
+FROM information_schema.columns
+WHERE table_name = '{table_name}'
+ORDER BY ordinal_position """)
+        with get_engine().begin() as conn:
+            result = pd.read_sql(query, conn)
+        return result['name'].tolist() if not result.empty else []
+    except Exception as e:
+        print(f'获取表结构失败: {str(e)}')
+        raise e
 
 def to_postgresql_data(table_name, upload_mode, df, batch_size=1000):
     """优化的分批插入版本 - PostgreSQL适配"""
@@ -148,3 +164,5 @@ def to_mysql_data_safe(table_name, upload_mode, df):
 
     print(f"🎉🎉 数据上传完成，共插入 {total_rows} 行")
     return True
+
+    
