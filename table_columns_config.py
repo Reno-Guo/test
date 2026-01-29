@@ -1,3 +1,4 @@
+      
 import re
 import pandas as pd
 from datetime import datetime, timedelta
@@ -33,7 +34,14 @@ ods_asin_sale_goal_table_columns =[
     #date,country,sku,pcogs,revenue,units
     'date','country','sku','pcogs','revenue','units'
 ]
-
+ods_category_dsp_file_columns =[
+    #Creative_Detail	Inventory	Funnel	Audience
+    'Creative_Detail','Inventory','Funnel','Audience'
+]
+ods_category_dsp_table_columns =[
+    #Creative_Detail	Inventory	Funnel	Audience
+    'creative_detail','inventory','funnel','audience'
+]
 
 def get_file_columns_config(table_name):
     if  'ods_asin_philips' in table_name:
@@ -42,6 +50,8 @@ def get_file_columns_config(table_name):
         return ods_date_event_file_columns
     elif 'ods_asin_sale_goal' in table_name:
         return ods_asin_sale_goal_file_columns
+    elif 'ods_category_dsp' in table_name:
+        return ods_category_dsp_file_columns
     return []
 
 def get_table_columns_config(table_name,df):
@@ -59,6 +69,8 @@ def get_table_columns_config(table_name,df):
         return result
     elif 'ods_asin_sale_goal' in table_name :
         df.columns = ods_asin_sale_goal_table_columns
+    elif 'ods_category_dsp' in table_name:
+        df.columns = ods_category_dsp_table_columns
         return df
     return df
 
@@ -516,3 +528,5 @@ if __name__ == "__main__":
         print("前10个goal值:", sample_goals.tolist())
     else:
         print("\n❌ 转换失败，请检查数据格式")
+
+    
