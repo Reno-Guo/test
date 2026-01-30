@@ -36,11 +36,11 @@ ods_asin_sale_goal_table_columns =[
 ]
 ods_category_dsp_file_columns =[
     #Creative_Detail	Inventory	Funnel	Audience
-    'Creative_Detail','Inventory','Funnel','Audience'
+    'Creative_Detail','Inventory','Funnel','Audience','Series','VCP'
 ]
 ods_category_dsp_table_columns =[
     #Creative_Detail	Inventory	Funnel	Audience
-    'creative_detail','inventory','funnel','audience'
+    'creative_detail','inventory','funnel','audience','series','vcp'
 ]
 
 def get_file_columns_config(table_name):
