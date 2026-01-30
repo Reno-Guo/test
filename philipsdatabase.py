@@ -490,7 +490,6 @@ def perform_upload(table_name, upload_mode, df, uploaded_file, backup_filename):
     """执行上传逻辑"""
     try:
         if 'ods_category_dsp' in table_name:
-            print(df)
             postgre_client.to_postgresql_data(table_name, upload_mode, df)
         else:
             engine = get_engine()
