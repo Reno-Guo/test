@@ -94,7 +94,7 @@ def to_postgresql_data(table_name, upload_mode, df, batch_size=1000):
                     if_exists='append',
                     index=False,
                     method='multi',
-                    chunksize=1000
+                    chunksize=5000
                 )
 
             inserted += len(batch_df)
