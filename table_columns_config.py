@@ -28,11 +28,11 @@ ods_date_event_table_columns =[
 ]
 ods_asin_sale_goal_file_columns =[
     #Date	Country	SKU	PCOGS	Order Revenue	Units
-    'Date','Country','SKU','PCOGS','Order Revenue','Units'
+    'Date','Country','SKU','PCOGS','Order Revenue','Units','ASIN'
 ]
 ods_asin_sale_goal_table_columns =[
     #date,country,sku,pcogs,revenue,units
-    'date','country','sku','pcogs','revenue','units'
+    'date','country','sku','pcogs','revenue','units','asin'
 ]
 ods_category_dsp_file_columns =[
     #Creative_Detail	Inventory	Funnel	Audience
