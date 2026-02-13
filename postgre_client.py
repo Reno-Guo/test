@@ -24,6 +24,8 @@ TABLES = {
     'ods_asin_sale_goal': 'ods_asin_sale_goal',
     'ods_date_event': 'ods_date_even',
     'ods_category_dsp': 'ods_category_dsp',
+    'offline_deal_sku': 'offline_deal_sku',
+    'offline_roas_subcategory': 'offline_roas_subcategory',
 }
 
 def get_engine():
