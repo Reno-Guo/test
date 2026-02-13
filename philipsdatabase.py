@@ -1,955 +1,560 @@
       
+import re
 import pandas as pd
-import streamlit as st
-from sqlalchemy import create_engine, text
-from urllib.parse import quote_plus
 from datetime import datetime, timedelta
-import random
-import smtplib
-from email.mime.text import MIMEText
-from email.header import Header
-import io
-import os
-import pytz
-import chardet
-import mysql_client
-import postgre_client
-import table_columns_config
-# ==================== 配置常量 ====================
-BRAND_COLOR = "#00a6e4"
-SECONDARY_COLOR = "#0088c7"
-SUCCESS_COLOR = "#00c853"
-WARNING_COLOR = "#ff9800"
-ERROR_COLOR = "#f44336"
-BEIJING_TZ = pytz.timezone('Asia/Shanghai')
-
-# 数据库配置
-DB_CONFIG = {
-    'username': 'haiyi',
-    'password': 'G7f@2eBw',
-    'host': '47.109.55.96',
-    'port': 8124,
-    'database': 'semanticdb_haiyi'
-}
-
-# 邮件配置
-EMAIL_CONFIG = {
-    'smtp_server': 'smtp.feishu.cn',
-    'smtp_port': 465,
-    'sender_email': 'idc_ow@oceanwing.com',
-    'sender_password': 'OkTIL1AxudQ2y2tC',
-    'log_recipient': 'reno.guo@oceanwing.com',
-    'cc_recipient': ['yana.cao@oceanwing.com']
-}
-
-# 表配置（移除未使用的icon和color）
-TABLES = {
-    'ASIN_goal_philips': {'name': 'ASIN 目标数据'},
-    'ods_category': {'name': '类目数据'},
-    'ods_asin_philips': {'name': 'Search term打标表'},
-    'SI_keyword_philips': {'name': 'SI 关键词数据'},
-    'ods_goal_vcp': {'name': 'Media Plan Goal'},
-    'ods_asin_sale_goal': {'name': 'Annual Goal ASIN Level'},
-    'ods_date_event': {'name': 'ods_date_event'},
-    'ods_category_dsp': {'name': 'ods_category_dsp'},
-    'offline_deal_sku': {'name': 'Offline Deal SKU'},
-    'offline_roas_subcategory': {'name': 'Offline ROAS Subcategory'},
-}
-
-postgre_tables = [
-    'ods_category_dsp',
-    'offline_deal_sku',
-    'offline_roas_subcategory',
+ods_asin_philips_file_columns = [
+                    'Branded ASINs',
+                    'Competitor ASINs',
+                    'Competitor Name',
+                    'Head non branded keywords',
+                    'Competitor Name',
+                    'Competitor Name-Broad Matching List'
+                ]
+ods_asin_philips_table_columns = [
+                    'Branded_ASINs',
+                    'Competitor_ASINs',
+                    'Head_non_branded_keywords',
+                    'Competitor_keywords_concat',
+                    'Competitor_brand_asin',
+                    'Competitor_brand_keywords'
+                ]
+ods_date_event_file_columns =[
+    #Star Date	End Date	Event Type	Event	country
+    'Star Date','End Date','Event Type','Event','country'
 ]
-# ==================== 自定义样式 ====================
-def apply_custom_styles():
-    st.markdown(f"""
-    <style>
-        /* 全局样式 */
-        .stApp {{
-            background: #ffffff;
-        }}
-        
-        /* 主标题 */
-        .main-title {{
-            color: {BRAND_COLOR};
-            font-size: 2.2rem;
-            font-weight: 700;
-            text-align: center;
-            padding: 1rem 0 0.3rem 0;
-            margin: 0;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-        }}
-        
-        .main-subtitle {{
-            text-align: center;
-            color: #666;
-            font-size: 0.95rem;
-            margin: 0 0 1.5rem 0;
-            font-weight: 400;
-        }}
-        
-        /* 分组标题 */
-        .section-title {{
-            color: {BRAND_COLOR};
-            font-size: 1.3rem;
-            font-weight: 600;
-            margin: 2rem 0 1rem 0;
-            padding-bottom: 0.5rem;
-            border-bottom: 2px solid {BRAND_COLOR};
-            display: flex;
-            align-items: center;
-        }}
-        
-        .section-title .icon {{
-            margin-right: 0.5rem;
-            font-size: 1.5rem;
-        }}
-        
-        /* 轻量分割线 */
-        .divider {{
-            height: 1px;
-            background: linear-gradient(90deg, transparent, #e0e0e0, transparent);
-            margin: 2rem 0;
-        }}
-        
-        .divider-thick {{
-            height: 2px;
-            background: linear-gradient(90deg, transparent, {BRAND_COLOR}, transparent);
-            margin: 2.5rem 0;
-            opacity: 0.3;
-        }}
-        
-        /* 验证码卡片 */
-        .auth-card {{
-            background: white;
-            border-radius: 16px;
-            padding: 2.5rem;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-            margin: 2rem auto;
-            max-width: 500px;
-            border-top: 4px solid {BRAND_COLOR};
-        }}
-        
-        /* 备份下载卡片 */
-        .backup-card {{
-            background: linear-gradient(135deg, #fff5e6 0%, #ffe8cc 100%);
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin: 1.5rem 0;
-            border: 2px solid {WARNING_COLOR};
-            box-shadow: 0 4px 12px rgba(255,152,0,0.2);
-        }}
-        
-        /* 按钮样式 */
-        .stButton > button {{
-            background: linear-gradient(135deg, {BRAND_COLOR} 0%, {SECONDARY_COLOR} 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 0.6rem 1.5rem;
-            font-weight: 600;
-            transition: all 0.3s;
-            box-shadow: 0 2px 8px rgba(0,166,228,0.3);
-        }}
-        
-        .stButton > button:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,166,228,0.5);
-        }}
-        
-        .stDownloadButton > button {{
-            background: white;
-            color: {BRAND_COLOR};
-            border: 2px solid {BRAND_COLOR};
-            border-radius: 8px;
-            font-weight: 600;
-            transition: all 0.3s;
-        }}
-        
-        .stDownloadButton > button:hover {{
-            background: {BRAND_COLOR};
-            color: white;
-        }}
-        
-        /* 输入框样式 */
-        .stTextInput > div > div > input {{
-            border-radius: 8px;
-            border: 2px solid #e0e0e0;
-            transition: all 0.3s;
-            padding: 0.75rem;
-        }}
-        
-        .stTextInput > div > div > input:focus {{
-            border-color: {BRAND_COLOR};
-            box-shadow: 0 0 0 3px rgba(0,166,228,0.1);
-        }}
-        
-        /* 选择框 */
-        .stSelectbox > div > div {{
-            border-radius: 8px;
-        }}
-        
-        /* Radio按钮 */
-        .stRadio > div {{
-            background: transparent;
-            padding: 0;
-        }}
-        
-        .stRadio > div > label {{
-            background: white;
-            padding: 0.8rem 1.2rem;
-            border-radius: 8px;
-            border: 2px solid #e0e0e0;
-            margin: 0.3rem 0;
-            transition: all 0.3s;
-        }}
-        
-        .stRadio > div > label:hover {{
-            border-color: {BRAND_COLOR};
-            background: #f0f9ff;
-        }}
-        
-        /* 信息框优化 */
-        .stAlert {{
-            border-radius: 8px;
-            border-left: 4px solid {BRAND_COLOR};
-        }}
-        
-        /* 使用说明区域 */
-        .info-box {{
-            background: #f8f9fa;
-            border-left: 4px solid {BRAND_COLOR};
-            border-radius: 4px;
-            padding: 1rem 1.5rem;
-            margin: 1.5rem 0;
-            color: #666;
-            font-size: 0.95rem;
-            line-height: 1.8;
-        }}
-        
-        .info-box ul {{
-            margin: 0.5rem 0;
-            padding-left: 1.5rem;
-        }}
-        
-        .info-box li {{
-            margin: 0.3rem 0;
-        }}
-        
-        /* 状态徽章 */
-        .badge {{
-            display: inline-block;
-            padding: 0.3rem 0.8rem;
-            border-radius: 12px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            margin: 0.25rem;
-        }}
-        
-        .badge-success {{
-            background: {SUCCESS_COLOR};
-            color: white;
-        }}
-        
-        .badge-warning {{
-            background: {WARNING_COLOR};
-            color: white;
-        }}
-        
-        .badge-info {{
-            background: {BRAND_COLOR};
-            color: white;
-        }}
-    </style>
-    """, unsafe_allow_html=True)
+ods_date_event_table_columns =[
+    #date,Events,event_type,country
+    'date','Events','event_type','country'
+]
+ods_asin_sale_goal_file_columns =[
+    #Date	Country	SKU	PCOGS	Order Revenue	Units
+    'Date','Country','SKU','PCOGS','Order Revenue','Units','ASIN'
+]
+ods_asin_sale_goal_table_columns =[
+    #date,country,sku,pcogs,revenue,units
+    'date','country','sku','pcogs','revenue','units','asin'
+]
+ods_category_dsp_file_columns =[
+    #Creative_Detail	Inventory	Funnel	Audience
+    'Creative_Detail','Inventory','Funnel','Audience','Series','VCP'
+]
+ods_category_dsp_table_columns =[
+    #Creative_Detail	Inventory	Funnel	Audience
+    'creative_detail','inventory','funnel','audience','series','vcp'
+]
 
-# ==================== 工具函数 ====================
-def init_session_state():
-    """统一初始化session_state"""
-    defaults = {
-        'captcha_verified': False,
-        'captcha_code': None,
-        'captcha_expiry': None,
-        'code_sent': False,
-        'backup_generated': False,
-        'backup_buffer': None,
-        'backup_filename': None,
-        'backup_row_msg': '',
-        'current_df': None,
-        'current_table': None,
-        'current_mode': None,
-        'current_uploaded_file': None,
-        'backup_download_confirmed': False,
-        'selected_table': list(TABLES.keys())[0]
-    }
-    st.session_state.update({k: v for k, v in defaults.items() if k not in st.session_state})
+offline_deal_sku_file_columns = [
+    'country','VCP','SUB category','SKU','ASIN','Start Date','End Date',
+    'Sell Out Unit Deal  Forecast',' Promo Price',' PCOGS Deal Forecast',
+    ' Deal 检查','deal 生效价格','daily unit 目标','Actual unit ','爆发系数'
+]
+offline_deal_sku_table_columns = [
+    'country','vcp','sub_category','sku','asin','start_date','end_date',
+    'sell_out_unit_deal_forecast','promo_price','pcogs_deal_forecast',
+    'deal_check','deal_effective_price','daily_unit_target','actual_unit','burst_coefficient'
+]
 
-def get_engine():
-    """创建数据库连接"""
-    password_encoded = quote_plus(DB_CONFIG['password'])
-    connection_string = f"clickhouse://{DB_CONFIG['username']}:{password_encoded}@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
-    return create_engine(connection_string)
+offline_roas_subcategory_file_columns = [
+    'country','Subcategory','Focus tier(1 = Max)','ROAS Floor','ROAS Target'
+]
+offline_roas_subcategory_table_columns = [
+    'country','subcategory','focus_tier','roas_floor','roas_target'
+]
 
-def table_exists(engine, table_name, database):
-    """检查表是否存在"""
-    query = text(f"SELECT * FROM system.tables WHERE name = '{table_name}' AND database = '{database}' LIMIT 1")
-    with engine.connect() as conn:
-        result = pd.read_sql(query, conn)
-    return not result.empty
+def get_file_columns_config(table_name):
+    if  'ods_asin_philips' in table_name:
+        return  ods_asin_philips_file_columns
+    elif 'ods_date_even' in table_name :
+        return ods_date_event_file_columns
+    elif 'ods_asin_sale_goal' in table_name:
+        return ods_asin_sale_goal_file_columns
+    elif 'ods_category_dsp' in table_name:
+        return ods_category_dsp_file_columns
+    elif 'offline_deal_sku' in table_name:
+        return offline_deal_sku_file_columns
+    elif 'offline_roas_subcategory' in table_name:
+        return offline_roas_subcategory_file_columns
+    return []
 
-def test_insert_permission(engine, table_name, database):
-    """测试INSERT权限 - 动态获取表结构"""
-    try:
-        query = text(f"SELECT name, type FROM system.columns WHERE table = '{table_name}' AND database = '{database}' ORDER BY position LIMIT 5")
-        with engine.connect() as conn:
-            columns_info = pd.read_sql(query, conn)
-        
-        if columns_info.empty:
-            return False
-        
-        test_values = []
-        test_columns = []
-        cleanup_condition = None
-        
-        for _, row in columns_info.iterrows():
-            col_name = row['name']
-            col_type = row['type'].lower()
-            test_columns.append(col_name)
-            
-            if 'int' in col_type or 'float' in col_type or 'decimal' in col_type:
-                test_values.append('0')
-            elif 'date' in col_type or 'time' in col_type:
-                test_values.append("'1970-01-01'")
-            else:
-                test_values.append("'__PERM_TEST__'")
-                if cleanup_condition is None:
-                    cleanup_condition = f"{col_name} = '__PERM_TEST__'"
-        
-        if cleanup_condition is None:
-            cleanup_condition = f"{test_columns[0]} = {test_values[0]}"
-        
-        with engine.connect() as conn:
-            insert_sql = text(f"INSERT INTO {table_name} ({', '.join(test_columns)}) VALUES ({', '.join(test_values)})")
-            conn.execute(insert_sql)
-            cleanup_sql = text(f"DELETE FROM {table_name} WHERE {cleanup_condition}")
-            conn.execute(cleanup_sql)
-            
-        return True
-    except Exception:
-        return False
+def get_table_columns_config(table_name,df):
+    if 'ods_asin_philips' in table_name:
+        df.columns = ods_asin_philips_table_columns
+        return df
+    elif 'ods_date_even' in table_name:
+        df=process_ods_date_event_data( df)
+        return df
+    elif 'ods_goal_vcp' in table_name:
+        result = convert_excel_correct_goal(df)
+        if result is None or len(result) == 0:
+            print("\n=== 正确Goal转换失败，尝试简单转换 ===")
+            result = convert_excel_simple_correct_goal(df)
+        return result
+    elif 'ods_asin_sale_goal' in table_name :
+        df.columns = ods_asin_sale_goal_table_columns
+    elif 'ods_category_dsp' in table_name:
+        df.columns = ods_category_dsp_table_columns
+        return df
+    elif 'offline_deal_sku' in table_name:
+        df.columns = offline_deal_sku_table_columns
+        return df
+    elif 'offline_roas_subcategory' in table_name:
+        df.columns = offline_roas_subcategory_table_columns
+        return df
+    return df
 
-def get_table_columns(engine, table_name, database):
-    """获取数据库表的列名"""
-    try:
-        query = text(f"SELECT name FROM system.columns WHERE table = '{table_name}' AND database = '{database}' ORDER BY position")
-        with engine.connect() as conn:
-            result = pd.read_sql(query, conn)
-        return result['name'].tolist() if not result.empty else []
-    except Exception as e:
-        st.error(f'获取表结构失败: {str(e)}')
-        return []
 
-def clean_data(df, table_name=None, database=None):
-    """数据清洗 - 根据数据库表结构动态处理"""
-    df.columns = [col.strip() for col in df.columns]
-    
-    if table_name and database:
+def expand_date_range(df, start_date_col='Star Date', end_date_col='End Date', event_col='Event',
+                      event_type_col='Event Type', country_col='country'):
+    """
+    将日期范围数据展开为每天一条记录
+
+    参数:
+    - df: 输入的DataFrame
+    - start_date_col: 开始日期列名
+    - end_date_col: 结束日期列名
+    - event_col: 事件列名
+    - event_type_col: 事件类型列名
+    - country_col: 国家列名
+    """
+
+    expanded_rows = []
+
+    for index, row in df.iterrows():
         try:
-            engine = get_engine()
-            query = text(f"SELECT name, type FROM system.columns WHERE table = '{table_name}' AND database = '{database}'")
-            with engine.connect() as conn:
-                columns_info = pd.read_sql(query, conn)
-            
-            col_type_map = dict(zip(columns_info['name'], columns_info['type']))
-            
-            for col in df.columns:
-                if col not in col_type_map:
-                    continue
-                
-                db_type = col_type_map[col].lower()
-                
-                if any(t in db_type for t in ['int', 'float', 'decimal', 'double']):
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-                elif any(t in db_type for t in ['date', 'datetime', 'timestamp']):
-                    df[col] = pd.to_datetime(df[col], errors='coerce')
-                elif any(t in db_type for t in ['string', 'char', 'varchar', 'text']):
-                    df[col] = df[col].astype(str).str.strip().replace('nan', '')
+            # 解析开始和结束日期
+            start_date = pd.to_datetime(row[start_date_col])
+            end_date = pd.to_datetime(row[end_date_col])
+
+            # 验证日期有效性
+            if pd.isna(start_date) or pd.isna(end_date):
+                print(f"警告: 行 {index} 的日期无效，跳过")
+                continue
+
+            # 生成日期范围内的每一天
+            current_date = start_date
+            while current_date <= end_date:
+                new_row = {
+                    'date': current_date.date(),  # 转换为日期格式
+                    'Events': row[event_col],
+                    'event_type': row[event_type_col],
+                    'country': row[country_col]
+                }
+                expanded_rows.append(new_row)
+                current_date += timedelta(days=1)
         except Exception as e:
-            st.warning(f'⚠️ 无法获取表结构进行智能清洗,使用基础清洗: {str(e)}')
-            df = basic_clean_data(df)
+            print(f"处理行 {index} 时出错: {e}")
+            continue
+
+    # 创建新的DataFrame
+    if expanded_rows:
+        expanded_df = pd.DataFrame(expanded_rows)
+        return expanded_df
     else:
-        df = basic_clean_data(df)
-    
-    return df
+        return pd.DataFrame(columns=['date', 'Events', 'event_type', 'country'])
 
-def basic_clean_data(df):
-    """基础数据清洗 - 不依赖数据库结构"""
-    df.columns = [col.strip() for col in df.columns]
-    
-    for col in df.columns:
-        try:
-            numeric_series = pd.to_numeric(df[col], errors='coerce')
-            if numeric_series.notna().mean() > 0.5:
-                df[col] = numeric_series
-            else:
-                df[col] = df[col].astype(str).str.strip()
-        except:
-            df[col] = df[col].astype(str).str.strip()
-    
-    return df
 
-def send_email(to_email, subject, body, cc_emails=None):
-    """通用发送邮件函数"""
-    msg = MIMEText(body, 'plain', 'utf-8')
-    msg['Subject'] = Header(subject, 'utf-8')
-    msg['From'] = EMAIL_CONFIG['sender_email']
-    msg['To'] = to_email
-    
-    if cc_emails:
-        msg['Cc'] = ', '.join(cc_emails)
-    
+def process_ods_date_event_data(df):
+    """
+    专门处理 ods_date_event 表的数据转换
+    将 Star Date 和 End Date 之间的日期范围展开为每一天
+    """
+    if df.empty:
+        return df
+
+    # 确保日期列是datetime类型
+    df['Star Date'] = pd.to_datetime(df['Star Date'], errors='coerce')
+    df['End Date'] = pd.to_datetime(df['End Date'], errors='coerce')
+
+    # 调用展开函数
+    expanded_df = expand_date_range(
+        df,
+        start_date_col='Star Date',
+        end_date_col='End Date',
+        event_col='Event',
+        event_type_col='Event Type',
+        country_col='country'
+    )
+
+    return expanded_df
+
+def convert_excel_correct_goal_file_path(input_file_path):
+    """
+    转换Excel数据，goal字段只取Budget值，跳过Budget%
+    """
+    print(f"正在处理文件: {input_file_path}")
+
     try:
-        recipients = [to_email] + (cc_emails or [])
-        with smtplib.SMTP_SSL(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port']) as server:
-            server.login(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['sender_password'])
-            server.sendmail(EMAIL_CONFIG['sender_email'], recipients, msg.as_string())
-        return True
+        # 读取Excel文件
+        df = pd.read_excel(input_file_path, sheet_name='Sheet1', header=None)
+        result = convert_excel_correct_goal(df)
+        return result
     except Exception as e:
-        st.error(f'📧 发送邮件失败: {str(e)}')
-        return False
+        print(f"读取文件 {input_file_path} 时出错: {e}")
+        return None
 
-def send_email_code(to_email, code):
-    """发送验证码邮件"""
-    beijing_time = datetime.now(BEIJING_TZ)
-    subject = 'semanticdb_haiyi数据库操作程序验证码'
-    body = f'您的验证码是: {code}\n有效期: 5 分钟\n\n发送时间: {beijing_time.strftime("%Y-%m-%d %H:%M:%S")} (北京时间)'
-    return send_email(to_email, subject, body)
-
-def generate_code():
-    """生成6位数字验证码"""
-    return ''.join(random.choices('0123456789', k=6))
-
-# ==================== 导出功能 ====================
-def export_table(table_name, mode='full', filename=None):
-    """通用导出函数：支持全表/备份（CSV）或模板（XLSX）"""
+def convert_excel_correct_goal(df):
+    """
+    转换Excel数据，goal字段只取Budget值，跳过Budget%
+    """
     try:
-        # 特殊处理 ods_goal_vcp 表的模板下载
-        if mode == 'columns' and 'ods_goal_vcp' in table_name:
-            template_path = 'temp/ods_goal_vcp.xlsx'
-
-            if os.path.exists(template_path):
-                with open(template_path, 'rb') as f:
-                    buffer = io.BytesIO(f.read())
-                buffer.seek(0)
-                return buffer, f'{table_name}_template.xlsx', None, None
-
-        engine = get_engine()
-        if table_name not in postgre_tables:
-            if not table_exists(engine, table_name, DB_CONFIG['database']):
-                return None, f'表 {table_name} 不存在。'
-        
-        if mode == 'columns':
-            column_names = table_columns_config.get_file_columns_config(table_name)
-            if column_names==[]:
-                query = text(f"SELECT name FROM system.columns WHERE table = '{table_name}' AND database = '{DB_CONFIG['database']}' ORDER BY position")
-                with engine.connect() as conn:
-                    df_columns = pd.read_sql(query, conn)
-
-                if df_columns.empty:
-                    return None, '未找到列信息。'
-                column_names = df_columns['name'].tolist()
-            df = pd.DataFrame(columns=column_names)
-            output_buffer = io.BytesIO()
-            with pd.ExcelWriter(output_buffer, engine='openpyxl') as writer:
-                df.to_excel(writer, index=False)
-            output_buffer.seek(0)
-            return output_buffer, f'{table_name}_template.xlsx', None, None
-
-
-        # 全表或备份模式
-        query = text(f"SELECT * FROM {table_name}")
-        if table_name in postgre_tables:
-            with postgre_client.get_engine().begin() as conn:
-                df=pd.read_sql(query, conn)
-        else:
-            with engine.connect() as conn:
-                df = pd.read_sql(query, conn)
-        
-        if df.empty:
-            return None, None, None, '表为空,无数据导出。'
-        
-        if not filename:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f'{table_name}_backup_{timestamp}.csv' if mode == 'backup' else f'{table_name}_full_data.csv'
-        
-        output_buffer = io.BytesIO()
-        df.to_csv(output_buffer, index=False, encoding='utf-8')
-        output_buffer.seek(0)
-        
-        row_msg = f",包含 {len(df)} 行数据" if not df.empty else "(表为空)"
-        return output_buffer, filename, row_msg, None
-    except Exception as e:
-        return None, None, None, f'导出失败: {str(e)}'
-
-# ==================== 上传功能 ====================
-def perform_upload(table_name, upload_mode, df, uploaded_file, backup_filename):
-    """执行上传逻辑"""
-    try:
-        if table_name in postgre_tables:
-            postgre_client.to_postgresql_data(table_name, upload_mode, df)
-        else:
-            engine = get_engine()
-
-            if not table_exists(engine, table_name, DB_CONFIG['database']):
-                return f'表 {table_name} 不存在。请先重建表。'
-
-            if not test_insert_permission(engine, table_name, DB_CONFIG['database']):
-                grant_sql = f"GRANT INSERT ON {DB_CONFIG['database']}.{table_name} TO {DB_CONFIG['username']};"
-                if upload_mode == 'replace':
-                    grant_sql += f"\nGRANT TRUNCATE ON {DB_CONFIG['database']}.{table_name} TO {DB_CONFIG['username']};"
-                return f'权限不足。请联系管理员执行:\n{grant_sql}'
-
-
-            with engine.connect() as conn:
-                if upload_mode == 'replace':
-                    try:
-                        conn.execute(text(f"TRUNCATE TABLE {table_name}"))
-                        st.info(f"✓ 表 {table_name} 已清空。")
-                    except Exception as truncate_e:
-                        st.warning(f'TRUNCATE 失败: {str(truncate_e)}\n使用 DELETE 清空。')
-                        conn.execute(text(f"DELETE FROM {table_name}"))
-
-                df.to_sql(table_name, engine, if_exists='append', index=False)
-                mysql_client.to_mysql_data(table_name,upload_mode,df)
-                postgre_client.to_postgresql_data(table_name,upload_mode,df)
-
-        beijing_time = datetime.now(BEIJING_TZ)
-        operation_type = '覆盖 (Replace)' if upload_mode == 'replace' else '续表 (Append)'
-        row_count = len(df)
-        
-        log_subject = 'semanticdb_haiyi数据库上传操作日志'
-        log_body = f"""数据库上传操作日志
-
-操作时间: {beijing_time.strftime("%Y-%m-%d %H:%M:%S")} (北京时间)
-操作类型: {operation_type}
-操作表名: {table_name}
-上传文件: {uploaded_file.name}
-上传行数: {row_count}
-备份文件: {backup_filename}
-操作说明: 数据已成功{"清空并" if upload_mode == "replace" else ""}上传到 ClickHouse 数据库。
-如有疑问,请联系管理员。"""
-        
-        if send_email(EMAIL_CONFIG['log_recipient'], log_subject, log_body, EMAIL_CONFIG['cc_recipient']):
-            st.info('📧 操作日志已发送到指定邮箱。')
-        else:
-            st.warning('⚠️ 上传成功,但日志邮件发送失败。')
-        
-        return f'成功: 已{operation_type} {row_count} 行数据到表 {table_name}。'
-    
-    except Exception as e:
-        return f'上传失败: {str(e)}\n\n提示:检查权限或重建表后重试。'
-
-def read_csv_with_encoding(uploaded_file):
-    """使用chardet自动检测编码并读取CSV"""
-    uploaded_file.seek(0)
-    
-    try:
-        raw_data = uploaded_file.read(min(100000, uploaded_file.size))
-        uploaded_file.seek(0)
-        detected = chardet.detect(raw_data)
-        encoding = detected['encoding']
-        confidence = detected['confidence']
-        
-        if encoding and confidence > 0.7:
-            try:
-                df = pd.read_csv(uploaded_file, encoding=encoding, na_values=['', 'NA', 'N/A', 'NULL', 'null', 'None', '#N/A', 'nan', 'NaN'],
-                                 keep_default_na=True, skip_blank_lines=True)
-                if encoding.lower() in ['utf-8', 'ascii']:
-                    st.success(f'✅ 文件编码: **{encoding.upper()}** (置信度: {confidence:.0%})')
+        # 打印数据结构用于分析
+        print("\n=== 数据结构详细分析 ===")
+        for i in range(min(15, len(df))):
+            row_preview = []
+            for j in range(min(15, df.shape[1])):
+                cell = df.iloc[i, j]
+                if pd.isna(cell):
+                    row_preview.append('NaN')
                 else:
-                    st.info(f'ℹ️ 检测到文件编码: **{encoding.upper()}** (置信度: {confidence:.0%}),已自动转换')
-                return df
-            except Exception as e:
-                st.warning(f'⚠️ 使用检测到的编码 {encoding} 读取失败: {str(e)},尝试常用编码...')
+                    cell_str = str(cell)
+                    row_preview.append(cell_str[:15])
+            print(f"行 {i}: {row_preview}")
+
+        # 从数据中提取国家信息
+        countries = extract_countries_from_data(df)
+        print(f"提取到的国家列表: {countries}")
+
+        # 处理数据
+        result_data = []
+        year = 2026
+
+        # 月份映射
+        months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+        current_ad_type = None
+
+        print("\n=== 开始处理数据 ===")
+
+        for i in range(len(df)):
+            # 获取第一列的值（国家信息）
+            country_cell = df.iloc[i, 0] if df.shape[1] > 0 else None
+
+            if pd.notna(country_cell):
+                cell_str = str(country_cell)
+
+                # 检查是否是SA部分标题
+                if 'SA' in cell_str and 'Budget' in cell_str:
+                    current_ad_type = 'SA'
+                    print(f"行 {i}: 找到SA部分 - {cell_str}")
+                    continue
+
+                # 检查是否是DSP部分标题
+                elif 'DSP' in cell_str and 'Budget' in cell_str:
+                    current_ad_type = 'DSP'
+                    print(f"行 {i}: 找到DSP部分 - {cell_str}")
+                    continue
+
+                # 检查是否是其他国家相关的标题（跳过）
+                elif any(keyword in cell_str for keyword in ['Total', 'VCP', 'Year', 'Budget']):
+                    print(f"行 {i}: 跳过标题行 - {cell_str}")
+                    continue
+
+            # 如果是数据行且有当前数据类型
+            if current_ad_type and i > 0:
+                # 检查第一列是否是有效国家代码
+                country = country_cell
+                if (pd.notna(country) and
+                        str(country).strip() in countries and
+                        str(country).strip() != ''):
+
+                    # 获取产品类别（应该是第二列）
+                    category = df.iloc[i, 1] if df.shape[1] > 1 else None
+
+                    if pd.notna(category) and str(category).strip() != '':
+                        print(f"行 {i}: 处理{current_ad_type}数据 - 国家: {country}, 类别: {category}")
+
+                        # 处理该行的月度数据（从第3列开始，只取Budget列，跳过Budget%列）
+                        for month_idx, month_name in enumerate(months):
+                            budget_col_idx = 3 + month_idx * 2  # Budget列（每2列的第一列）
+
+                            if budget_col_idx < df.shape[1]:
+                                budget_value = extract_numeric_value(df.iloc[i, budget_col_idx])
+
+                                # 跳过百分比列（下一列）
+                                # percentage_col_idx = budget_col_idx + 1  # 这是Budget%列，我们跳过
+
+                                print(f"  {month_name}: Budget列{budget_col_idx} = {budget_value}")
+
+                                # 使用yyyy-MM-dd格式的日期
+                                date_str = month_to_date_string(year, month_name)
+
+                                result_data.append({
+                                    'VCP_Category': str(category).strip(),
+                                    'ad_type': current_ad_type,
+                                    'time': date_str,
+                                    'goal': budget_value,
+                                    'Country': str(country).strip()
+                                })
+
+        # 创建结果DataFrame
+        result_df = pd.DataFrame(result_data)
+
+        # 保存结果
+        output_file = "表3_正确Goal转换结果.xlsx"
+        result_df.to_excel(output_file, index=False)
+
+        print(f"\n=== 转换结果摘要 ===")
+        print(f"输出文件: {output_file}")
+        print(f"总记录数: {len(result_df)}")
+
+        if len(result_df) > 0:
+            print_statistics(result_df)
         else:
-            st.warning(f'⚠️ 编码检测置信度较低({confidence:.0%}),尝试常用编码...')
+            print("警告: 未生成任何记录")
+            # 尝试备用方法
+            return convert_excel_alternative_correct_goal(df, countries, year)
+
+        return result_df
+
     except Exception as e:
-        st.warning(f'⚠️ 自动检测编码失败: {str(e)},尝试常用编码...')
-    
-    uploaded_file.seek(0)
-    common_encodings = ['utf-8', 'utf-8-sig', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift_jis', 'euc_kr', 'iso-8859-1', 'cp1252', 'latin1']
-    
-    for encoding in common_encodings:
-        try:
-            uploaded_file.seek(0)
-            df = pd.read_csv(uploaded_file, encoding=encoding, na_values=['', 'NA', 'N/A', 'NULL', 'null', 'None', '#N/A', 'nan', 'NaN'],
-                             keep_default_na=True, skip_blank_lines=True)
-            if encoding != 'utf-8':
-                st.info(f'ℹ️ 使用编码: **{encoding.upper()}**')
-            return df
-        except (UnicodeDecodeError, UnicodeError):
-            continue
-        except Exception:
-            continue
-    
-    st.error("""
-    ❌ **无法读取CSV文件**
-    
-    **可能原因:**
-    1. 文件编码格式非常罕见
-    2. 文件已损坏
-    3. 文件包含二进制数据
-    
-    **建议操作:**
-    1. 用Excel打开文件,另存为 **UTF-8 CSV** 格式
-    2. 或使用记事本打开,选择 **另存为** → **编码选择UTF-8**
-    3. 确认文件是标准CSV格式（逗号分隔）
-    """)
-    return None
-
-def upload_data(table_name, upload_mode, uploaded_file):
-    """上传数据主函数"""
-    if uploaded_file is None:
-        return '请选择文件'
-    
-    original_filename = uploaded_file.name
-    file_lower = original_filename.lower()
-    st.info(f'📄 正在处理文件: **{original_filename}**')
-    
-    try:
-        df = None
-        
-        if file_lower.endswith('.csv'):
-            st.info('📝 识别为 CSV 文件，正在检测编码...')
-            df = read_csv_with_encoding(uploaded_file)
-            if df is None:
-                return '❌ 无法读取CSV文件\n\n**可能原因:**\n1. 文件编码无法识别\n2. 文件已损坏\n3. 文件格式不正确\n\n**建议操作:**\n- 用Excel打开后另存为 UTF-8 CSV\n- 确认文件是标准CSV格式（逗号分隔）'
-        
-        elif file_lower.endswith(('.xlsx', '.xls')):
-            st.info('📊 识别为 Excel 文件，正在读取...')
-            try:
-                df = pd.read_excel(uploaded_file)
-            except Exception as e:
-                return f'❌ 读取Excel文件失败: {str(e)}\n\n请确认文件未损坏，或尝试另存为CSV格式。'
-        
-        else:
-            extension = original_filename.split('.')[-1] if '.' in original_filename else '无扩展名'
-            return f'❌ 不支持的文件格式\n\n**文件信息:**\n- 文件名: {original_filename}\n- 扩展名: .{extension}\n\n**支持的格式:**\n- .csv (推荐)\n- .xlsx\n- .xls\n\n请转换文件格式后重新上传。'
-        
-        if df is None:
-            return '❌ 文件读取失败，返回空数据'
-        
-        if df.empty:
-            return '❌ 文件内容为空，没有数据行'
-
-        df=table_columns_config.get_table_columns_config(table_name,df)
-        
-        st.success(f'✅ 文件读取成功！数据维度: **{len(df)}** 行 × **{len(df.columns)}** 列')
-        
-        preview_cols = df.columns.tolist()[:5]
-        preview = f'{", ".join(preview_cols)} ... (共{len(df.columns)}列)' if len(df.columns) > 5 else ", ".join(preview_cols)
-        st.info(f'📋 列名预览: {preview}')
-        
-        st.info('🧹 正在清洗数据...')
-        if table_name not in postgre_tables:
-            df = clean_data(df, table_name, DB_CONFIG['database'])
-        
-        if df.empty:
-            return '❌ 数据清洗后为空，可能所有数据都是无效的'
-        
-        st.info('🔍 正在验证表结构...')
-        db_columns= []
-        if table_name in postgre_tables:
-            db_columns = postgre_client.get_table_columns( table_name, DB_CONFIG['database'])
-        else:
-            engine = get_engine()
-            db_columns = get_table_columns(engine, table_name, DB_CONFIG['database'])
-        
-        if not db_columns:
-            return f'❌ 无法获取表 {table_name} 的结构信息\n\n请检查:\n1. 表是否存在\n2. 数据库连接是否正常\n3. 是否有查询权限'
-        
-        file_columns = df.columns.tolist()
-
-        invalid_cols = [col for col in file_columns if col not in db_columns]
-        
-        if invalid_cols:
-            return f'❌ 表头验证失败\n\n**文件中存在数据库表不包含的列:**\n{", ".join(invalid_cols)}\n\n**数据库表 [{table_name}] 的所有列:**\n{", ".join(db_columns)}\n\n**请执行以下操作之一:**\n1. 删除文件中的无效列\n2. 修改列名使其匹配数据库表\n3. 在数据库中添加缺失的列'
-        
-        st.success(f'✅ 表头验证通过！文件列: {len(file_columns)} 个 | 数据库列: {len(db_columns)} 个')
-        
-        st.session_state.current_df = df
-        st.session_state.current_table = table_name
-        st.session_state.current_mode = upload_mode
-        st.session_state.current_uploaded_file = uploaded_file
-        
-        if not st.session_state.backup_generated:
-            st.info('💾 正在生成备份...')
-            buffer, filename, row_msg, error = export_table(table_name, mode='backup')
-            if error:
-                return f'❌ 备份失败: {error}'
-            
-            st.session_state.backup_buffer = buffer
-            st.session_state.backup_filename = filename
-            st.session_state.backup_row_msg = row_msg
-            st.session_state.backup_generated = True
-            st.success('✅ 备份已生成')
-        
-        return 'backup_ready'
-    
-    except Exception as e:
-        st.session_state.backup_generated = False
+        print(f"处理过程中出错: {str(e)}")
         import traceback
-        st.error('💥 发生错误')
-        with st.expander('🔍 查看详细错误信息', expanded=True):
-            st.code(traceback.format_exc())
-        return f'❌ 上传失败: {str(e)}\n\n点击上方展开查看详细错误信息'
+        traceback.print_exc()
+        return None
 
-# ==================== UI组件 ====================
-def render_divider(thick=False):
-    """复用分割线"""
-    cls = "divider-thick" if thick else "divider"
-    st.markdown(f'<div class="{cls}"></div>', unsafe_allow_html=True)
 
-def render_table_selector():
-    """渲染表选择器"""
-    st.markdown('<div class="section-title"><span class="icon">📊</span>选择数据表</div>', unsafe_allow_html=True)
-    
-    table_options = [(table_name, TABLES[table_name]['name']) for table_name in TABLES.keys()]
-    current_index = 0
-    for i, (table_name, _) in enumerate(table_options):
-        if table_name == st.session_state.selected_table:
-            current_index = i
-            break
+def extract_countries_from_data(df):
+    """从数据中提取国家信息"""
+    countries = set()
 
-    # 创建显示选项，格式为 "显示名称 (表名)"
-    display_options = [f"{display_name} ({table_name})" for table_name, display_name in table_options]
+    # 分析数据，提取有效的国家代码
+    for i in range(len(df)):
+        cell = df.iloc[i, 0] if df.shape[1] > 0 else None
+        if pd.notna(cell):
+            cell_str = str(cell).strip()
+            # 识别常见的国家代码（2-3个字母）
+            if (len(cell_str) in [2, 3] and
+                    cell_str.isalpha() and
+                    cell_str.isupper() and
+                    cell_str not in ['SA', 'DSP', 'VCP', 'NaN', 'Total', 'Year', 'Budget']):
+                countries.add(cell_str)
 
-    # 获取当前选择的显示文本
-    current_display = f"{TABLES[st.session_state.selected_table]['name']} ({st.session_state.selected_table})"
-    current_display_index = 0
-    for i, option in enumerate(display_options):
-        if option == current_display:
-            current_display_index = i
-            break
+    # 如果没有找到标准国家代码，尝试从数据内容推断
+    if len(countries) == 0:
+        print("未找到标准国家代码，从数据内容推断...")
+        for i in range(1, min(50, len(df))):  # 检查前50行
+            cell = df.iloc[i, 0] if df.shape[1] > 0 else None
+            if pd.notna(cell):
+                cell_str = str(cell).strip()
+                # 排除明显的标题行
+                if (cell_str not in ['Total', 'VCP', 'Year', 'Budget', 'SA', 'DSP'] and
+                        not any(keyword in cell_str for keyword in ['Budget', 'Year', 'Total']) and
+                        len(cell_str) > 0):
+                    countries.add(cell_str)
 
-    selected_display = st.selectbox('选择要操作的数据表:', options=display_options, index=current_display_index,
-                                    key='table_selector')
+    return sorted(list(countries))
 
-    # 从显示文本中提取实际的表名
-    selected_table = selected_display.split('(')[-1].split(')')[0]  # 提取括号内的表名
 
-    if selected_table != st.session_state.selected_table:
-        st.session_state.selected_table = selected_table
-        st.rerun()
+def extract_numeric_value(cell_value):
+    """从单元格中提取数值"""
+    if pd.isna(cell_value):
+        return 0
 
-    render_divider()
-    return selected_table
+    cell_str = str(cell_value)
 
-def render_captcha_ui():
-    """渲染验证码界面"""
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown(f'<div style="text-align: center; margin-bottom: 1.5rem;"><span style="font-size: 3rem;">🔐</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<h2 style="text-align: center; color: {BRAND_COLOR}; margin-bottom: 1rem;">邮件验证码验证</h2>', unsafe_allow_html=True)
-        
-        to_email = EMAIL_CONFIG['log_recipient']
-        
-        if not st.session_state.code_sent:
-            st.info(f'📧 验证码将发送到: **{to_email}**')
-            if st.button('📨 发送验证码', use_container_width=True):
-                with st.spinner('正在发送验证码...'):
-                    code = generate_code()
-                    if send_email_code(to_email, code):
-                        st.session_state.captcha_code = code
-                        st.session_state.captcha_expiry = datetime.now() + timedelta(minutes=5)
-                        st.session_state.code_sent = True
-                        st.success(f'✅ 验证码已发送到 {to_email}')
-                        st.rerun()
-        else:
-            user_input = st.text_input('🔢 输入验证码:', max_chars=6, placeholder='请输入6位数字验证码')
-            
-            col_a, col_b = st.columns(2)
-            with col_a:
-                if st.button('✓ 验证', use_container_width=True):
-                    now = datetime.now()
-                    if now > st.session_state.captcha_expiry:
-                        st.error('⏰ 验证码已过期。请重新发送。')
-                        st.session_state.code_sent = False
-                        st.session_state.captcha_code = None
-                        st.session_state.captcha_expiry = None
-                    elif user_input == st.session_state.captcha_code:
-                        st.session_state.captcha_verified = True
-                        st.success('✅ 验证码正确!')
-                        st.balloons()
-                        st.rerun()
-                    else:
-                        st.error('❌ 验证码错误,请重试。')
-            
-            with col_b:
-                if st.button('🔄 重新发送', use_container_width=True):
-                    code = generate_code()
-                    if send_email_code(to_email, code):
-                        st.session_state.captcha_code = code
-                        st.session_state.captcha_expiry = datetime.now() + timedelta(minutes=5)
-                        st.success('✅ 新验证码已发送。')
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+    # 移除货币符号、千分位分隔符等
+    cell_str = re.sub(r'[€$,]', '', cell_str).strip()
 
-def render_main_ui():
-    """渲染主界面"""
-    table_name = render_table_selector()
+    # 提取数字
+    numeric_match = re.search(r'[-+]?\d*\.\d+|\d+', cell_str)
+    if numeric_match:
+        try:
+            return float(numeric_match.group())
+        except:
+            return 0
+    return 0
 
-    with st.expander("📋 查看当前表结构", expanded=False):
-        engine = get_engine()
-        db_columns = get_table_columns(engine, table_name, DB_CONFIG['database'])
-        if db_columns:
-            table_display_name = TABLES[table_name]['name']
-            st.info(f"表 **{table_name}** ({table_display_name}) 包含 {len(db_columns)} 个字段:")
-            cols = st.columns(3)
-            for idx, col in enumerate(db_columns):
-                cols[idx % 3].markdown(f"• `{col}`")
-        else:
-            st.warning("无法获取表结构信息")
-    
-    render_divider(thick=True)
-    
-    st.markdown('<div class="section-title"><span class="icon">📥</span>数据导出</div>', unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button('📋 导出空表模板', use_container_width=True):
-            with st.spinner('正在生成模板...'):
-                buffer, filename, _, error = export_table(table_name, mode='columns')
-                if error:
-                    st.error(f'❌ {error}')
-                else:
-                    st.download_button(label='⬇️ 下载空表模板 (XLSX)', data=buffer, file_name=filename,
-                                       mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', use_container_width=True)
-    
-    with col2:
-        if st.button('📦 下载全表数据', use_container_width=True):
-            with st.spinner('正在导出数据...'):
-                buffer, filename, _, error = export_table(table_name, mode='full')
-                if error:
-                    st.error(f'❌ {error}')
-                else:
-                    st.download_button(label='⬇️ 下载全表数据 (CSV)', data=buffer, file_name=filename, mime='text/csv', use_container_width=True)
-    
-    render_divider(thick=True)
-    
-    st.markdown('<div class="section-title"><span class="icon">📤</span>数据上传</div>', unsafe_allow_html=True)
-    
-    st.markdown('**步骤 1: 选择上传方式**')
-    upload_mode = st.radio('上传方式:', ('🔄 覆盖模式 (Replace) - 清空表后上传', '➕ 续表模式 (Append) - 追加到现有数据'),
-                           horizontal=False, label_visibility="collapsed")
-    upload_mode = 'replace' if '覆盖' in upload_mode else 'append'
-    
-    render_divider()
-    
-    st.markdown('**步骤 2: 选择文件**')
-    uploaded_file = st.file_uploader('选择 CSV 或 XLSX 文件', type=['csv', 'xlsx'], help='支持 CSV 和 XLSX 格式的文件', label_visibility="collapsed")
-    
-    if uploaded_file:
-        st.success(f'✅ 已选择文件: **{uploaded_file.name}**')
-    
-    render_divider()
-    
-    st.markdown('**步骤 3: 开始上传**')
-    if st.button('🚀 开始上传数据', type='primary', use_container_width=True):
-        with st.spinner('正在处理文件...'):
-            result = upload_data(table_name, upload_mode, uploaded_file)
-            if result == 'backup_ready':
-                st.success('✅ 备份已准备好,请下载后继续。')
-            elif '成功' in result:
-                st.success(f'✅ {result}')
-                st.balloons()
-            else:
-                st.error(f'❌ {result}')
-    
-    if st.session_state.get('backup_generated', False):
-        render_divider(thick=True)
-        st.markdown('<div class="section-title"><span class="icon">💾</span>备份文件下载</div>', unsafe_allow_html=True)
-        
-        st.warning(f'⚠️ 备份文件已生成{st.session_state.backup_row_msg}')
-        st.info('📌 **重要提示**: 请先下载备份文件,然后勾选确认框,最后点击"继续上传"按钮。')
-        
-        col1, col2 = st.columns([2, 1])
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.download_button(
-                label=f'💾 下载备份文件: {st.session_state.backup_filename}',
-                data=st.session_state.backup_buffer,
-                file_name=st.session_state.backup_filename,
-                mime='text/csv',
-                use_container_width=True
-            )
-        with col2:
-            st.markdown('<div style="text-align: center; padding-top: 8px;">', unsafe_allow_html=True)
-            st.markdown('<span class="badge badge-warning">必须下载</span>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.session_state.backup_download_confirmed = st.checkbox('✓ 我已下载备份文件', value=st.session_state.backup_download_confirmed)
-        
-        if st.session_state.backup_download_confirmed:
-            if st.button('✅ 继续上传', type='primary', use_container_width=True):
-                with st.spinner('正在上传数据到数据库...'):
-                    result = perform_upload(st.session_state.current_table, st.session_state.current_mode, st.session_state.current_df,
-                                            st.session_state.current_uploaded_file, st.session_state.backup_filename)
-                    
-                    st.session_state.backup_generated = False
-                    st.session_state.backup_buffer = None
-                    st.session_state.backup_filename = None
-                    st.session_state.backup_row_msg = ''
-                    st.session_state.current_df = None
-                    st.session_state.current_table = None
-                    st.session_state.current_mode = None
-                    st.session_state.current_uploaded_file = None
-                    st.session_state.backup_download_confirmed = False
-                    
-                    if '成功' in result:
-                        st.success(f'✅ {result}')
-                        st.balloons()
-                    else:
-                        st.error(f'❌ {result}')
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    render_divider(thick=True)
-    
-    st.markdown('<div class="section-title"><span class="icon">📖</span>使用说明</div>', unsafe_allow_html=True)
-    st.markdown("""
-    <div class="info-box">
-    <ul>
-        <li><strong>导出空表模板</strong>: 生成包含列名的空 XLSX 文件,方便填写数据</li>
-        <li><strong>下载全表数据</strong>: 导出当前表的所有数据为 CSV 文件</li>
-        <li><strong>覆盖模式</strong>: 清空表中所有数据后上传新数据</li>
-        <li><strong>续表模式</strong>: 将新数据追加到现有数据之后</li>
-        <li><strong>备份机制</strong>: 上传前会自动创建备份,必须下载后才能继续</li>
-        <li><strong>操作日志</strong>: 每次上传操作都会发送邮件日志到管理员</li>
-    </ul>
-    </div>
-    """, unsafe_allow_html=True)
 
-# ==================== 主程序 ====================
-def main():
-    st.set_page_config(page_title="Database Manager", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
-    
-    apply_custom_styles()
-    init_session_state()
-    
-    st.markdown('<h1 class="main-title">📊 Database Manager</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="main-subtitle">semanticdb_haiyi 数据库管理系统</p>', unsafe_allow_html=True)
-    
-    render_divider()
-    
-    if not st.session_state.captcha_verified:
-        render_captcha_ui()
+def month_to_date_string(year, month_name):
+    """将月份转换为yyyy-MM-dd格式的日期字符串"""
+    month_map = {
+        'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+        'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+    }
+
+    month_num = month_map.get(month_name, 1)
+    date_obj = datetime(year, month_num, 1)
+    return date_obj.strftime('%Y-%m-%d')
+
+
+def print_statistics(result_df):
+    """打印统计信息"""
+    print(f"产品类别数: {result_df['VCP_Category'].nunique()}")
+
+    sa_count = len(result_df[result_df['ad_type'] == 'SA'])
+    dsp_count = len(result_df[result_df['ad_type'] == 'DSP'])
+    print(f"SA记录数: {sa_count}")
+    print(f"DSP记录数: {dsp_count}")
+
+    sa_total = result_df[result_df['ad_type'] == 'SA']['goal'].sum()
+    dsp_total = result_df[result_df['ad_type'] == 'DSP']['goal'].sum()
+    print(f"SA数据总和: {sa_total:,.2f}")
+    print(f"DSP数据总和: {dsp_total:,.2f}")
+
+    print(f"国家分布: {result_df['Country'].value_counts().to_dict()}")
+
+    print("\n前10条记录预览:")
+    print(result_df.head(10))
+
+    # 显示数据验证
+    print("\n=== 数据验证 ===")
+    sample_records = result_df.head(6)
+    for idx, record in sample_records.iterrows():
+        print(f"类别: {record['VCP_Category']}, 类型: {record['ad_type']}, "
+              f"时间: {record['time']}, 目标: {record['goal']}, 国家: {record['Country']}")
+
+
+def convert_excel_alternative_correct_goal(df, countries, year):
+    """备用转换方法，只取Budget值"""
+    print("=== 使用备用转换方法（只取Budget值）===")
+
+    result_data = []
+    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+    # 简单处理：按行处理，第一列是国家，第二列是类别
+    for i in range(2, len(df)):  # 从第3行开始
+        country = df.iloc[i, 0] if df.shape[1] > 0 else None
+        category = df.iloc[i, 1] if df.shape[1] > 1 else None
+
+        if pd.isna(country) or pd.isna(category):
+            continue
+
+        country_str = str(country).strip()
+        category_str = str(category).strip()
+
+        # 确定广告类型（根据行位置或内容）
+        if i < 20:  # 前20行假设是SA
+            ad_type = 'SA'
+        else:  # 后面的是DSP
+            ad_type = 'DSP'
+
+        # 检查是否是有效数据行
+        if (len(country_str) > 0 and len(category_str) > 0 and
+                country_str not in ['Total', 'VCP', 'Year', 'Budget'] and
+                category_str not in ['Total', 'VCP', 'Year', 'Budget']):
+
+            print(f"行 {i}: {ad_type} - 国家: {country_str}, 类别: {category_str}")
+
+            for month_idx, month_name in enumerate(months):
+                budget_col_idx = 4 + month_idx * 2  # 只取Budget列
+
+                if budget_col_idx < df.shape[1]:
+                    budget_value = extract_numeric_value(df.iloc[i, budget_col_idx])
+                    date_str = month_to_date_string(year, month_name)
+
+                    result_data.append({
+                        'VCP_Category': category_str,
+                        'ad_type': ad_type,
+                        'time': date_str,
+                        'goal': budget_value,
+                        'Country': country_str
+                    })
+
+    result_df = pd.DataFrame(result_data)
+
+    if len(result_df) > 0:
+        output_file = "表3_备用正确Goal转换结果.xlsx"
+        result_df.to_excel(output_file, index=False)
+        print(f"备用方法转换完成！生成 {len(result_df)} 条记录")
+        print_statistics(result_df)
+
+    return result_df
+
+def convert_excel_simple_correct_goal_file_path(input_file_path):
+    """简单直接的处理版本，只取Budget值"""
+    print("=== 使用简单直接处理版本 ===")
+
+    df = pd.read_excel(input_file_path, sheet_name='Sheet1', header=None)
+    result = convert_excel_simple_correct_goal(df)
+    return result
+def convert_excel_simple_correct_goal(df):
+    """简单直接的处理版本，只取Budget值"""
+    print("=== 使用简单直接处理版本 ===")
+
+    result_data = []
+    year = 2026
+    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+    # 假设数据格式：
+    # 第一列：国家
+    # 第二列：产品类别
+    # 第3列开始：月度数据（Budget, Budget%, Budget, Budget%, ...）
+
+    for i in range(2, len(df)):  # 从第3行开始
+        country = df.iloc[i, 0] if df.shape[1] > 0 else None
+        category = df.iloc[i, 1] if df.shape[1] > 1 else None
+
+        if pd.isna(country) or pd.isna(category):
+            continue
+
+        country_str = str(country).strip()
+        category_str = str(category).strip()
+
+        # 跳过标题行
+        if any(keyword in country_str for keyword in ['Total', 'VCP', 'Year', 'Budget']):
+            continue
+        if any(keyword in category_str for keyword in ['Total', 'VCP', 'Year', 'Budget']):
+            continue
+
+        # 根据行位置确定SA/DSP
+        ad_type = 'SA' if i < 30 else 'DSP'  # 假设前30行是SA，后面是DSP
+
+        print(f"行 {i}: {ad_type} - 国家: {country_str}, 类别: {category_str}")
+
+        for month_idx, month_name in enumerate(months):
+            budget_col_idx = 4 + month_idx * 2  # 只取Budget列，跳过Budget%
+
+            if budget_col_idx < df.shape[1]:
+                budget_value = extract_numeric_value(df.iloc[i, budget_col_idx])
+                date_str = month_to_date_string(year, month_name)
+
+                result_data.append({
+                    'VCP_Category': category_str,
+                    'ad_type': ad_type,
+                    'time': date_str,
+                    'goal': budget_value,
+                    'Country': country_str
+                })
+
+    result_df = pd.DataFrame(result_data)
+
+    if len(result_df) > 0:
+        output_file = "表3_简单正确Goal转换结果.xlsx"
+        result_df.to_excel(output_file, index=False)
+        print(f"简单转换完成！生成 {len(result_df)} 条记录")
+        print_statistics(result_df)
+
+    return result_df
+
+
+# 使用示例
+if __name__ == "__main__":
+    input_file = r"C:\Users\lenovo\Downloads\新建 Microsoft Excel 工作表.xlsx"
+
+    # 首先尝试正确goal转换
+    print("=== 尝试正确Goal转换 ===")
+    result = convert_excel_correct_goal(input_file)
+
+    if result is None or len(result) == 0:
+        print("\n=== 正确Goal转换失败，尝试简单转换 ===")
+        result = convert_excel_simple_correct_goal(input_file)
+
+    if result is not None and len(result) > 0:
+        print(result.columns.tolist())
+        print("\n🎉 转换成功完成！")
+        print(f"📊 总记录数: {len(result)}")
+        print(f"🌍 涉及国家: {sorted(result['Country'].unique().tolist())}")
+        print(f"📈 SA记录: {len(result[result['ad_type'] == 'SA'])}")
+        print(f"📊 DSP记录: {len(result[result['ad_type'] == 'DSP'])}")
+
+        # 验证goal字段只包含Budget值
+        print("\n✅ Goal字段验证：只包含Budget数值，不包含百分比")
+        sample_goals = result['goal'].head(10)
+        print("前10个goal值:", sample_goals.tolist())
     else:
-        render_main_ui()
-    # render_main_ui()
-if __name__ == '__main__':
-    main()
-    #streamlit run philipsdatabase2.py
+        print("\n❌ 转换失败，请检查数据格式")
 
     
