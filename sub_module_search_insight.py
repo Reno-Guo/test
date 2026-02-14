@@ -76,26 +76,76 @@ def render_app_header(emoji_title: str, subtitle: str):
 def get_timestamp() -> str:
     return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
+# --- 新增辅助函数：模糊匹配 ---
+def is_fuzzy_match(token: str, brand: str, max_edits: int = 1) -> bool:
+    """
+    判断 token 和 brand 的编辑距离是否 <= max_edits
+    """
+    n, m = len(token), len(brand)
+    if abs(n - m) > max_edits:
+        return False
+    
+    if max_edits == 0:
+        return token == brand
+
+    if n < m:
+        token, brand = brand, token
+        n, m = m, n
+        
+    previous_row = range(m + 1)
+    for i, c1 in enumerate(token):
+        current_row = [i + 1]
+        for j, c2 in enumerate(brand):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    
+    return previous_row[-1] <= max_edits
+
+# --- 修改后的分析函数 ---
 def analyze_search_rows(df: pd.DataFrame, params: List[tuple]):
     punct = str.maketrans("", "", '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~')
-    brands = df["品牌名称"].dropna().unique()
+    
+    # 预处理品牌：去空、去重、转小写
+    raw_brands = df["品牌名称"].dropna().unique()
+    brands = [str(b).strip().lower() for b in raw_brands if str(b).strip()]
+
     for p, _ in params:
         df[p] = ""
     df["品牌"] = ""
     df["特性参数"] = ""
+    
     results = []
     brand_words = []
+    
     pb = st.progress(0)
     status = st.empty()
+    total_rows = len(df)
+
     for idx, row in df.iterrows():
-        status.text(f"正在分析第 {idx+1}/{len(df)} 条数据...")
+        # 优化进度条显示频率
+        if idx % 50 == 0:
+            status.text(f"正在分析第 {idx+1}/{total_rows} 条数据...")
+            pb.progress((idx + 1) / total_rows)
+            
         sword = str(row["搜索词"]).lower()
         vol = row["搜索量"] if pd.notna(row["搜索量"]) else 0
         m_brands = []
-        for b in brands:
-            b_low = str(b).lower()
+
+        # 分词：用于模糊匹配检查
+        # 将搜索词拆分为单词列表，例如 "philips led light" -> ["philips", "led", "light"]
+        sword_tokens = re.split(r'[\s\W]+', sword)
+        sword_tokens = [t for t in sword_tokens if t]
+
+        for b_low in brands:
+            matched = False
+            
+            # --- 1. 原有的精确/正则匹配逻辑 ---
             if len(b_low) <= 5:
                 if re.search(rf"\b{re.escape(b_low)}\b", sword):
+                    matched = True
                     m_brands.append(b_low)
             else:
                 norms = [
@@ -105,21 +155,34 @@ def analyze_search_rows(df: pd.DataFrame, params: List[tuple]):
                     b_low.translate(punct).replace(" ", ""),
                 ]
                 if any(n in sword for n in norms):
+                    matched = True
                     m_brands.append(b_low)
+            
+            # --- 2. 新增：模糊匹配逻辑 (如果还没匹配上，且品牌词长度>3) ---
+            if not matched and len(b_low) > 3:
+                for token in sword_tokens:
+                    # 允许1个字符的编辑距离（错字、漏字、多字）
+                    if is_fuzzy_match(token, b_low, max_edits=1):
+                        m_brands.append(b_low)
+                        break
+
+        # 记录结果
         df.at[idx, "品牌"] = ",".join(set(m_brands))
+        
         m_params = []
         for p_name, p_vals in params:
             m_vals = [str(v).lower() for v in p_vals if str(v).lower() in sword]
             df.at[idx, p_name] = ",".join(set(m_vals))
             m_params.extend(m_vals)
         df.at[idx, "特性参数"] = ",".join(set(m_params))
+        
         if m_brands:
             results.append("Branded KWs")
             for b in set(m_brands):
                 brand_words.append({"品牌名称": b, "搜索量": vol})
         else:
             results.append("Non-Branded KWs")
-        pb.progress((idx + 1) / len(df))
+            
     status.empty()
     pb.empty()
     df["词性"] = results
