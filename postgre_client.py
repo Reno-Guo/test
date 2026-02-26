@@ -26,6 +26,7 @@ TABLES = {
     'ods_category_dsp': 'ods_category_dsp',
     'offline_deal_sku': 'offline_deal_sku',
     'offline_roas_subcategory': 'offline_roas_subcategory',
+    'offline_target_daily': 'offline_target_daily',
 }
 
 def get_engine():
