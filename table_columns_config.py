@@ -43,6 +43,31 @@ ods_category_dsp_table_columns =[
     'creative_detail','inventory','funnel','audience','series','vcp'
 ]
 
+offline_deal_sku_file_columns = [
+    'country','VCP','SUB category','SKU','ASIN','Start Date','End Date',
+    'Sell Out Unit Deal  Forecast',' Promo Price',' PCOGS Deal Forecast',
+    ' Deal 检查','deal 生效价格','daily unit 目标','Actual unit ','爆发系数'
+]
+offline_deal_sku_table_columns = [
+    'country','vcp','sub_category','sku','asin','start_date','end_date',
+    'sell_out_unit_deal_forecast','promo_price','pcogs_deal_forecast',
+    'deal_check','deal_effective_price','daily_unit_target','actual_unit','burst_coefficient'
+]
+
+offline_roas_subcategory_file_columns = [
+    'country','Subcategory','Focus tier(1 = Max)','ROAS Floor','ROAS Target'
+]
+offline_roas_subcategory_table_columns = [
+    'country','subcategory','focus_tier','roas_floor','roas_target'
+]
+
+offline_target_daily_file_columns = [
+    'date','country','roas','spend'
+]
+offline_target_daily_table_columns = [
+    'date','country','roas','spend'
+]
+
 def get_file_columns_config(table_name):
     if  'ods_asin_philips' in table_name:
         return  ods_asin_philips_file_columns
@@ -52,6 +77,12 @@ def get_file_columns_config(table_name):
         return ods_asin_sale_goal_file_columns
     elif 'ods_category_dsp' in table_name:
         return ods_category_dsp_file_columns
+    elif 'offline_deal_sku' in table_name:
+        return offline_deal_sku_file_columns
+    elif 'offline_roas_subcategory' in table_name:
+        return offline_roas_subcategory_file_columns
+    elif 'offline_target_daily' in table_name:
+        return offline_target_daily_file_columns
     return []
 
 def get_table_columns_config(table_name,df):
@@ -71,6 +102,15 @@ def get_table_columns_config(table_name,df):
         df.columns = ods_asin_sale_goal_table_columns
     elif 'ods_category_dsp' in table_name:
         df.columns = ods_category_dsp_table_columns
+        return df
+    elif 'offline_deal_sku' in table_name:
+        df.columns = offline_deal_sku_table_columns
+        return df
+    elif 'offline_roas_subcategory' in table_name:
+        df.columns = offline_roas_subcategory_table_columns
+        return df
+    elif 'offline_target_daily' in table_name:
+        df.columns = offline_target_daily_table_columns
         return df
     return df
 
