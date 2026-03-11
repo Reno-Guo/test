@@ -128,40 +128,50 @@ def data_clean_app():
         output_filename = st.text_input("输出文件名", "cleaned_files.zip", key="clean_save")
     st.divider()
     execute_btn = st.button("🚀 开始清理", key="clean_button", use_container_width=True)
+    
     if execute_btn:
         if not uploaded_file or not output_filename:
             st.warning("⚠️ 请确保已选择 .zip 文件并输入输出文件名")
             return
+            
         with st.spinner("🔄 正在清理文件，请稍候..."):
-            def cb_clean(df, fname, tdir):
-                df = df.iloc[1:].reset_index(drop=True)
-                out_path = os.path.join(tdir, f"cleaned_{fname}")
-                ext = os.path.splitext(fname)[1].lower()
-                write_processed_file(df, out_path, ext)
-                return out_path
-            processed = process_zip_files(uploaded_file, read_file_clean, cb_clean)
-            if not processed:
-                return
-            status = st.empty()
-            prog = st.progress(0)
-            status.text("正在打包ZIP文件...")
-            buffer = io.BytesIO()
-            with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as nz:
-                nz.setpassword(None)
-                for i, p in enumerate(processed):
-                    original_name = os.path.basename(p).replace("cleaned_", "")
-                    nz.write(p, original_name, compress_type=zipfile.ZIP_DEFLATED)
-                    prog.progress((i + 1) / len(processed))
-            buffer.seek(0)
-            status.text("打包完成")
-            status.empty()
-            prog.empty()
-            st.success(f"✅ 成功清理 {len(processed)} 个文件")
-            render_download_section(
-                buffer,
-                output_filename,
-                "application/zip",
-                "📥 下载清理后的 ZIP 文件",
-                "cleaned",
-                has_save=False,
-            )
+            
+            with tempfile.TemporaryDirectory() as temp_dir:
+                def cb_clean(df, fname, tdir):
+                    df = df.iloc[1:].reset_index(drop=True)
+                    out_path = os.path.join(tdir, f"cleaned_{fname}")
+                    ext = os.path.splitext(fname)[1].lower()
+                    write_processed_file(df, out_path, ext)
+                    return out_path
+                
+                processed = process_zip_files(uploaded_file, read_file_clean, cb_clean, temp_dir)
+                
+                if not processed:
+                    return
+                
+                status = st.empty()
+                prog = st.progress(0)
+                status.text("正在打包ZIP文件...")
+                buffer = io.BytesIO()
+                
+                with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as nz:
+                    nz.setpassword(None)
+                    for i, p in enumerate(processed):
+                        original_name = os.path.basename(p).replace("cleaned_", "")
+                        nz.write(p, original_name, compress_type=zipfile.ZIP_DEFLATED)
+                        prog.progress((i + 1) / len(processed))
+                        
+                buffer.seek(0)
+                status.text("打包完成")
+                status.empty()
+                prog.empty()
+                st.success(f"✅ 成功清理 {len(processed)} 个文件")
+                
+                render_download_section(
+                    buffer,
+                    output_filename,
+                    "application/zip",
+                    "📥 下载清理后的 ZIP 文件",
+                    "cleaned",
+                    has_save=False,
+                )
