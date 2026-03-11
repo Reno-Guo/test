@@ -86,34 +86,34 @@ def process_zip_files(
     uploaded_file,
     read_cb: Callable[[str], pd.DataFrame | None],
     process_cb: Callable[[pd.DataFrame, str, str], Any],
+    temp_dir: str
 ) -> List[Any]:
-    with tempfile.TemporaryDirectory() as temp_dir:
-        zip_path = os.path.join(temp_dir, uploaded_file.name)
-        with open(zip_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        with zipfile.ZipFile(zip_path, "r") as z:
-            z.extractall(temp_dir)
-        files = [f for f in os.listdir(temp_dir) if f.lower().endswith((".xlsx", ".xls", ".csv"))]
-        if not files:
-            st.warning("📂 压缩文件中未找到任何 Excel 或 CSV 文件")
-            return []
-        results = []
-        pb = st.progress(0)
-        status = st.empty()
-        for i, f in enumerate(files):
-            status.text(f"正在处理: {f} ({i+1}/{len(files)})")
-            fp = os.path.join(temp_dir, f)
-            try:
-                df = read_cb(fp)
-                if df is None:
-                    raise ValueError("不支持的文件格式")
-                results.append(process_cb(df, f, temp_dir))
-            except Exception as e:
-                st.error(f"❌ 处理文件 {f} 失败: {e}")
-            pb.progress((i + 1) / len(files))
-        status.empty()
-        pb.empty()
-        return results
+    zip_path = os.path.join(temp_dir, uploaded_file.name)
+    with open(zip_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    with zipfile.ZipFile(zip_path, "r") as z:
+        z.extractall(temp_dir)
+    files = [f for f in os.listdir(temp_dir) if f.lower().endswith((".xlsx", ".xls", ".csv"))]
+    if not files:
+        st.warning("📂 压缩文件中未找到任何 Excel 或 CSV 文件")
+        return []
+    results = []
+    pb = st.progress(0)
+    status = st.empty()
+    for i, f in enumerate(files):
+        status.text(f"正在处理: {f} ({i+1}/{len(files)})")
+        fp = os.path.join(temp_dir, f)
+        try:
+            df = read_cb(fp)
+            if df is None:
+                raise ValueError("不支持的文件格式")
+            results.append(process_cb(df, f, temp_dir))
+        except Exception as e:
+            st.error(f"❌ 处理文件 {f} 失败: {e}")
+        pb.progress((i + 1) / len(files))
+    status.empty()
+    pb.empty()
+    return results
 
 def data_clean_app():
     render_app_header("🧹 DC - 数据清理: 删除第一行", "批量删除Excel/CSV文件的第一行数据并重新打包")
