@@ -78,9 +78,9 @@ def read_file_clean(file_path: str) -> pd.DataFrame | None:
 
 def write_processed_file(df: pd.DataFrame, path: str, ext: str):
     if ext == ".csv":
-        df.to_csv(path, index=False)
+        df.to_csv(path, index=False, header=False)
     else:
-        df.to_excel(path, index=False, engine="openpyxl")
+        df.to_excel(path, index=False, header=False, engine="openpyxl")
 
 def process_zip_files(
     uploaded_file,
