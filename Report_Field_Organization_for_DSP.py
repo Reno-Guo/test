@@ -26,6 +26,8 @@ CREATIVE_FIXED_HEADERS = [
 ]
 DATE_NUMBER_FORMAT = "mmm dd, yyyy"
 PRIMARY_COLOR = "#00a6e4"
+WEEK_MODE_MONDAY_TO_SUNDAY = "monday_to_sunday"
+WEEK_MODE_SUNDAY_TO_SATURDAY = "sunday_to_saturday"
 
 
 def normalize_header(value):
@@ -67,12 +69,14 @@ def find_header(headers, candidates):
     return None, None
 
 
-def excel_weeknum(date_value):
+def excel_weeknum(date_value, week_mode=WEEK_MODE_SUNDAY_TO_SATURDAY):
+    if week_mode == WEEK_MODE_MONDAY_TO_SUNDAY:
+        return int(date_value.strftime("%W")) + 1
     return int(date_value.strftime("%U")) + 1
 
 
-def week_code(date_value):
-    return f"W{date_value.strftime('%y')}{excel_weeknum(date_value):02d}"
+def week_code(date_value, week_mode=WEEK_MODE_SUNDAY_TO_SATURDAY):
+    return f"W{date_value.strftime('%y')}{excel_weeknum(date_value, week_mode):02d}"
 
 
 def parse_date_value(value):
@@ -197,7 +201,7 @@ def parse_creative_fields(value, total_columns):
     return result
 
 
-def derive_date_fields(value):
+def derive_date_fields(value, week_mode=WEEK_MODE_SUNDAY_TO_SATURDAY):
     parsed_date = parse_date_value(value)
     if parsed_date is None:
         return "", value if value is not None else "", "", ""
@@ -205,7 +209,7 @@ def derive_date_fields(value):
     return (
         parsed_date.year,
         parsed_date,
-        week_code(parsed_date),
+        week_code(parsed_date, week_mode),
         parsed_date.month,
     )
 
@@ -223,7 +227,7 @@ def load_openpyxl():
     return Workbook, load_workbook
 
 
-def build_processed_workbook(workbook):
+def build_processed_workbook(workbook, week_mode=WEEK_MODE_SUNDAY_TO_SATURDAY):
     Workbook, _ = load_openpyxl()
     worksheet = workbook.active
 
@@ -285,7 +289,7 @@ def build_processed_workbook(workbook):
         creative_value = row[creative_index].value
 
         derived_values = []
-        derived_values.extend(derive_date_fields(date_value))
+        derived_values.extend(derive_date_fields(date_value, week_mode))
         derived_values.extend(parse_order_fields(order_value, order_total_columns))
         derived_values.extend(parse_line_fields(line_value, line_total_columns))
         derived_values.extend(parse_creative_fields(creative_value, creative_total_columns))
@@ -305,17 +309,17 @@ def build_processed_workbook(workbook):
     return new_workbook, max(worksheet.max_row - 1, 0)
 
 
-def process_workbook(input_path, output_path):
+def process_workbook(input_path, output_path, week_mode=WEEK_MODE_SUNDAY_TO_SATURDAY):
     _, load_workbook = load_openpyxl()
     workbook = load_workbook(input_path)
-    new_workbook, _ = build_processed_workbook(workbook)
+    new_workbook, _ = build_processed_workbook(workbook, week_mode)
     new_workbook.save(output_path)
 
 
-def process_workbook_bytes(input_bytes):
+def process_workbook_bytes(input_bytes, week_mode=WEEK_MODE_SUNDAY_TO_SATURDAY):
     _, load_workbook = load_openpyxl()
     workbook = load_workbook(io.BytesIO(input_bytes))
-    new_workbook, processed_rows = build_processed_workbook(workbook)
+    new_workbook, processed_rows = build_processed_workbook(workbook, week_mode)
     output_buffer = io.BytesIO()
     new_workbook.save(output_buffer)
     output_buffer.seek(0)
@@ -363,6 +367,17 @@ def streamlit_app():
 
     st.title("广告报表字段拆分")
     st.caption("上传 `.xlsx` 文件，自动拆分 Date / Order / Line item / Creative 字段并下载处理结果。")
+    week_mode_label = st.selectbox(
+        "周定义",
+        options=["周一到周日", "周日到周六"],
+        index=0,
+        help="选择后会影响输出结果中的 Week 周数。",
+    )
+    week_mode = (
+        WEEK_MODE_MONDAY_TO_SUNDAY
+        if week_mode_label == "周一到周日"
+        else WEEK_MODE_SUNDAY_TO_SATURDAY
+    )
 
     uploaded_file = st.file_uploader("上传广告报表", type=["xlsx"])
     if uploaded_file is None:
@@ -378,7 +393,7 @@ def streamlit_app():
     if st.button("开始处理", type="primary", use_container_width=True):
         try:
             with st.spinner("正在处理，请稍候..."):
-                output_bytes, processed_rows = process_workbook_bytes(uploaded_file.getvalue())
+                output_bytes, processed_rows = process_workbook_bytes(uploaded_file.getvalue(), week_mode)
         except Exception as exc:
             st.error(f"处理失败：{exc}")
             return
