@@ -147,7 +147,9 @@ def process_files(data_files, match_file):
                     
                     if not is_b0_pattern:
                         # 这是关键词逻辑
-                        if "blueland" in clean_val:
+                        # clean_val 已转为小写并移除空格，"Blue land" 会匹配 "blueland"。
+                        # 品牌词优先于竞品品牌词，包含 "blue" 也归为 Brand KW。
+                        if any(brand in clean_val for brand in ("blueland", "blue")):
                             label = "Brand KW"
                         else:
                             # 细分 Non-brand
@@ -222,7 +224,7 @@ with st.sidebar:
         st.markdown("**文件类型**: `.xlsx`\n\n**列结构**:\n- **第1列**: Blueland 品牌 ASIN\n- **第2列**: 竞品品牌名称 (Keywords)\n\n**用途**:\n- 第1列用于判断 Brand PAT\n- 第2列用于判断 CMP KW")
     
     st.markdown("### 🏷️ 标注规则 (修改)")
-    st.markdown('<div style="font-size: 0.9rem; line-height: 1.8;"><b>关键词类型：</b><br>🔹 <b>Brand KW</b>: 包含 "blueland" 的关键词<br>🔹 <b>CMP KW</b>: 不包含 blueland，但包含匹配文件中定义的竞品品牌的关键词<br>🔹 <b>Cate KW</b>: 既不包含 blueland 也不包含竞品品牌的普通品类词<br><br><b>ASIN 类型：</b><br>🔹 <b>Brand PAT</b>: 匹配文件第1列中的 ASIN<br>🔹 <b>CMP PAT</b>: 非品牌 ASIN (竞品 ASIN)</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size: 0.9rem; line-height: 1.8;"><b>关键词类型（忽略大小写和空格）：</b><br>🔹 <b>Brand KW</b>: 包含 "blueland"、"Blue land" 或 "blue" 的关键词<br>🔹 <b>CMP KW</b>: 不包含上述品牌词，但包含匹配文件中定义的竞品品牌的关键词<br>🔹 <b>Cate KW</b>: 既不包含上述品牌词，也不包含竞品品牌的普通品类词<br><br><b>ASIN 类型：</b><br>🔹 <b>Brand PAT</b>: 匹配文件第1列中的 ASIN<br>🔹 <b>CMP PAT</b>: 非品牌 ASIN (竞品 ASIN)</div>', unsafe_allow_html=True)
 
 # 文件上传
 st.markdown("## 📤 文件上传")
