@@ -5,15 +5,217 @@
 """
 
 from bisect import bisect_right
+import csv
+import hashlib
+import io
 import json
 import math
+import re
 
+import pandas as pd
 import streamlit as st
 
 
 COUNTRIES = {"德国 DE": "DE", "西班牙 ES": "ES", "法国 FR": "FR", "意大利 IT": "IT", "英国 UK": "UK"}
 KINDS = {"月搜索量": "month", "周搜索量": "week"}
 MODEL_VERSION = "2026-11-17"
+MAX_ROWS = 10000
+EXAMPLE = "关键词\tABA排名\t参考搜索量\n空气炸锅\t10000\t18000\n咖啡机\t25000\t9000\n吸尘器\t80000\t4000"
+ALIASES = {
+    "关键词": ["关键词", "关键字", "搜索词", "keyword", "keywords", "searchterm", "term"],
+    "ABA排名": ["ABA排名", "排名", "rank", "abarank", "searchfrequencyrank", "ABA月排名", "ABA周排名", "月排名", "周排名"],
+    "参考搜索量": ["参考搜索量", "参考值", "参考月搜索量", "参考周搜索量", "月搜索量", "周搜索量", "搜索量", "reference", "referencevolume", "searchvolume", "volume"],
+    "站点": ["站点", "国家", "country", "marketplace", "market"],
+    "口径": ["口径", "周期", "kind", "periodtype", "frequency"],
+}
+
+
+def text_value(value):
+    return "" if value is None else str(value).strip()
+
+
+def normalise_header(value):
+    return re.sub(r"[\s_（）()]+", "", text_value(value)).lower().lstrip("\ufeff")
+
+
+def number(value):
+    """接受正常数字及规范千分位，拒绝把 1,2 猜成 12。"""
+    s = text_value(value).replace("，", ",")
+    if not s:
+        raise ValueError("为空")
+    if "," in s:
+        if not re.fullmatch(r"[+-]?\d{1,3}(,\d{3})+(\.\d+)?", s):
+            raise ValueError("数字格式不正确")
+        s = s.replace(",", "")
+    try:
+        v = float(s)
+    except (ValueError, TypeError):
+        raise ValueError("不是有效数字") from None
+    if not math.isfinite(v):
+        raise ValueError("不是有限数字")
+    return v
+
+
+def parse_rows(rows):
+    rows = [(line, list(row)) for line, row in enumerate(rows, 1) if any(text_value(v) for v in row)]
+    if not rows:
+        raise ValueError("没有读取到数据，请粘贴或上传关键词和排名。")
+    lookup = {normalise_header(alias): name for name, aliases in ALIASES.items() for alias in aliases}
+    first = [text_value(x) for x in rows[0][1]]
+    has_header = any(lookup.get(normalise_header(x)) == "ABA排名" for x in first)
+    if len(first) >= 2:
+        try:
+            number(first[1])
+            has_header = False  # 关键词恰好叫 rank 时，不能误删第一条数据。
+        except ValueError:
+            pass
+    if has_header:
+        headers = [lookup.get(normalise_header(x), "原表·" + (x or f"未命名列{i+1}")) for i, x in enumerate(first)]
+        if len(set(headers)) != len(headers):
+            raise ValueError("发现重复字段或多个排名／参考搜索量列，请每种字段只保留一列。")
+        rows = rows[1:]
+    else:
+        width = len(first)
+        if not 2 <= width <= 5:
+            raise ValueError("无表头时请按：关键词、ABA排名、参考搜索量（可选）、站点（可选）、口径（可选）排列。")
+        headers = ["关键词", "ABA排名", "参考搜索量", "站点", "口径"][:width]
+    if len(headers) > 50:
+        raise ValueError("列数过多，请只保留需要对比的数据列（最多 50 列）。")
+    if not rows:
+        raise ValueError("只有表头，没有需要计算的数据。")
+    if len(rows) > MAX_ROWS:
+        raise ValueError(f"每次最多 {MAX_ROWS:,} 行，请分批上传。")
+    rank_hint = ""
+    ref_hint = ""
+    if has_header:
+        for original, mapped in zip(first, headers):
+            hint = "month" if "月" in original else "week" if "周" in original else ""
+            if mapped == "ABA排名": rank_hint = hint
+            if mapped == "参考搜索量": ref_hint = hint
+    records = []
+    for i, (source_row, row) in enumerate(rows, 1):
+        error = ""
+        if len(row) > len(headers) and any(text_value(v) for v in row[len(headers):]):
+            error = "列数多于表头。含千分位的 CSV 数字需加引号，或从 Excel 复制后直接粘贴。"
+        record = {name: text_value(row[j]) if j < len(row) else "" for j, name in enumerate(headers)}
+        record.update({"_row": i, "_source_row": source_row, "_error": error, "_rank_kind": rank_hint, "_ref_kind": ref_hint})
+        records.append(record)
+    return records
+
+
+def parse_text(content):
+    content = content.lstrip("\ufeff")
+    first_line = next((line for line in content.splitlines() if line.strip()), "")
+    delimiter = "\t" if "\t" in first_line else ";" if ";" in first_line else ","
+    try:
+        rows = list(csv.reader(io.StringIO(content), delimiter=delimiter, strict=True))
+    except csv.Error:
+        raise ValueError("无法识别文本格式，请从 Excel 复制表格粘贴，或使用 CSV 模板。") from None
+    return parse_rows(rows)
+
+
+def parse_upload(data, name):
+    if len(data) > 10 * 1024 * 1024:
+        raise ValueError("文件超过 10 MB，请分批上传。")
+    if name.lower().endswith(".xlsx"):
+        from openpyxl import load_workbook
+        try:
+            wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+        except Exception:
+            raise ValueError("无法读取 Excel，请另存为有效的 .xlsx 文件后重试。") from None
+        try:
+            ws = wb.worksheets[0]
+            if (ws.max_row or 0) > MAX_ROWS + 1 or (ws.max_column or 0) > 50:
+                raise ValueError(f"Excel 范围过大，请只保留需要的数据（最多 {MAX_ROWS:,} 行和 50 列），清理多余空白行列后上传。")
+            return parse_rows(ws.iter_rows(values_only=True))
+        finally:
+            wb.close()
+    encodings = ["utf-16"] if data.startswith((b"\xff\xfe", b"\xfe\xff")) else ["utf-8-sig", "gb18030"]
+    for encoding in encodings:
+        try:
+            content = data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+        return parse_text(content)
+    raise ValueError("无法识别文件编码，请另存为 CSV UTF-8 后重试。")
+
+
+def resolve_country(value, default):
+    value = text_value(value)
+    if not value: return default
+    mapping = {"德国": "DE", "西班牙": "ES", "法国": "FR", "意大利": "IT", "英国": "UK", "GB": "UK"}
+    code = COUNTRIES.get(value, mapping.get(value.upper(), value.upper()))
+    if code not in COUNTRIES.values():
+        raise ValueError(f"不支持的站点：{value}")
+    return code
+
+
+def resolve_kind(value, default):
+    value = text_value(value).lower()
+    if not value: return default
+    mapping = {"月": "month", "月搜索量": "month", "monthly": "month", "month": "month", "周": "week", "周搜索量": "week", "weekly": "week", "week": "week"}
+    if value not in mapping: raise ValueError(f"不支持的口径：{value}（请填月或周）")
+    return mapping[value]
+
+
+def validation_end(country, kind):
+    return "2026-09-26" if kind == "week" and country in ("ES", "FR", "IT") else "2026-10-31" if kind == "week" else "2026-10"
+
+
+def batch_calculate(records, default_country, default_kind):
+    models = {(m["country"], m["kind"]): m for m in MODEL_DATA["models"]}
+    output = []
+    for record in records:
+        row = {"序号": record["_row"], "输入行号": record["_source_row"], "关键词": record.get("关键词", ""), "站点": record.get("站点") or default_country,
+               "口径": record.get("口径") or ("月" if default_kind == "month" else "周"),
+               "输入排名": record.get("ABA排名", ""), "ABA排名": None, "估算搜索量": None,
+               "输入参考值": record.get("参考搜索量", ""), "参考搜索量": None, "差额": None,
+               "偏差（%）": None, "绝对偏差（%）": None, "状态": "未计算", "说明": "",
+               "模型版本": MODEL_VERSION, "验证截至": ""}
+        row.update({k: v for k, v in record.items() if k.startswith("原表·")})
+        notes = []
+        try:
+            if record["_error"]: raise ValueError(record["_error"])
+            country = resolve_country(record.get("站点"), default_country)
+            kind = resolve_kind(record.get("口径"), record["_rank_kind"] or default_kind)
+            if record["_rank_kind"] and kind != record["_rank_kind"]:
+                raise ValueError("该行口径与排名列表头的周／月不一致。")
+            row.update(站点=country, 口径="月" if kind == "month" else "周", 验证截至=validation_end(country, kind))
+            try: rank = number(record.get("ABA排名"))
+            except ValueError as exc: raise ValueError(f"ABA排名{exc}") from None
+            result = calculate(models[country, kind], rank)
+            row.update(ABA排名=int(rank), 估算搜索量=result["volume"], 状态="正常")
+            notes.extend(result["warnings"])
+            reference = record.get("参考搜索量", "")
+            if text_value(reference):
+                try:
+                    ref = number(reference)
+                    if ref < 0: raise ValueError("不能小于 0")
+                    if record["_ref_kind"] and kind != record["_ref_kind"]:
+                        raise ValueError("的周／月口径与排名不一致")
+                    row["参考搜索量"] = ref
+                    row["差额"] = result["volume"] - ref
+                    if ref > 0:
+                        row["偏差（%）"] = (result["volume"] - ref) / ref * 100
+                        row["绝对偏差（%）"] = abs(row["偏差（%）"])
+                    else:
+                        notes.append("参考值为 0，仅计算差额，不计算百分比偏差。")
+                except ValueError as exc:
+                    notes.append(f"参考搜索量{exc}；已估算，但未比较。")
+            if notes: row["状态"] = "需留意"
+        except ValueError as exc:
+            notes.append(str(exc))
+        row["说明"] = "；".join(notes)
+        output.append(row)
+    return pd.DataFrame(output)
+
+
+def csv_bytes(frame):
+    """保留数值类型；转义可能被 Excel 当作公式的原始文本。"""
+    safe = frame.copy()
+    for col in safe.select_dtypes(include=["object", "string"]).columns:
+        safe[col] = safe[col].map(lambda x: "'" + x if isinstance(x, str) and x.lstrip().startswith(("=", "+", "-", "@")) else x)
+    return safe.to_csv(index=False).encode("utf-8-sig")
 
 
 def calculate(model, rank):
@@ -47,38 +249,16 @@ def calculate(model, rank):
     }
 
 
-def main():
-    st.set_page_config(page_title="ABA 搜索量计算器", page_icon="🔎", layout="centered")
-    st.title("ABA 搜索量计算器")
-    st.write("选择站点和口径，输入 ABA 排名，即可估算卖家精灵搜索量。")
-    st.info(
-        "**使用说明**\n\n"
-        "1. **选择站点**：支持德国、英国、法国、意大利和西班牙。\n"
-        "2. **选择周／月**：计算月搜索量时输入 **ABA 月排名**；"
-        "计算周搜索量时输入 **ABA 周排名**。\n"
-        "3. **输入排名**：结果会自动更新，无需点击计算按钮。\n\n"
-        "例如：选择「德国」「月搜索量」，输入排名 **10,000**，"
-        "估算结果约为 **17,568 次／月**。\n\n"
-        "结果是根据历史卖家精灵数据拟合的近似值，适合辅助判断关键词流量大小，"
-        "不是亚马逊官方搜索次数。排名超出支持范围时无法估算，部分长尾词误差可能较大。"
-    )
-
-    left, right = st.columns(2)
-    country_label = left.selectbox("站点", list(COUNTRIES), key="country")
-    kind_label = right.selectbox("计算口径", list(KINDS), key="kind")
-    country, kind = COUNTRIES[country_label], KINDS[kind_label]
-    model = next(m for m in MODEL_DATA["models"] if m["country"] == country and m["kind"] == kind)
-
+def render_single(model):
     rank = st.number_input("ABA 排名", min_value=1, value=10000, step=1, format="%d", key="rank",
                            help="计算月搜索量时请输入 ABA 月排名；计算周搜索量时请输入 ABA 周排名。")
-    st.caption(f"支持排名范围：{model['rmin']:,.0f}—{model['rmax']:,.0f}。修改输入后结果会自动更新。")
-
+    st.caption("修改排名后，单个结果会自动更新。")
     try:
         result = calculate(model, rank)
     except ValueError as exc:
         st.error(str(exc))
     else:
-        st.metric(f"估算{kind_label}", f"{result['volume']:,} 次")
+        st.metric("单个估算搜索量", f"{result['volume']:,} 次／{'月' if model['kind'] == 'month' else '周'}")
         for warning in result["warnings"]:
             st.warning(warning)
         with st.expander("查看本次计算公式"):
@@ -89,9 +269,98 @@ def main():
             )
             st.caption("ROUND 表示四舍五入；不同站点、口径和排名区间会使用不同参数。")
 
-    cutoff = "2026-09-26" if kind == "week" and country in ("ES", "FR", "IT") else "2026-10-31" if kind == "week" else "2026-10"
+
+def fill_example():
+    st.session_state["batch_text"] = EXAMPLE
+    st.session_state["batch_draft"] = EXAMPLE
+
+
+def render_batch(country, kind):
+    st.write("从 Excel 复制多行直接粘贴，或上传文件。**参考搜索量可不填**；填入后会计算与参考值的差异。")
+    st.caption("基本列：关键词｜ABA排名｜参考搜索量（可选）。也可增加「站点」「口径」列逐行指定；空白使用上方默认值。")
+    st.caption("排名列若明确命名为「ABA月排名」或「ABA周排名」，按列名的口径计算；与行内口径冲突时会提示。未识别的附加列随结果导出。")
+    method = st.radio("输入方式", ["粘贴表格", "上传文件"], horizontal=True, key="input_method")
+    template = pd.DataFrame([{"关键词": "示例词", "ABA排名": 10000, "参考搜索量": 18000, "站点": "DE", "口径": "月"}])
+    st.download_button("下载 CSV 输入模板", csv_bytes(template), "ABA输入模板.csv", "text/csv", on_click="ignore", key="template")
+    source = b""
+    name = ""
+    if method == "粘贴表格":
+        st.button("填入示例", on_click=fill_example)
+        if "batch_text" not in st.session_state:
+            st.session_state["batch_text"] = st.session_state.get("batch_draft", "")
+        text = st.text_area("粘贴关键词与排名", height=180, max_chars=2000000, key="batch_text",
+                            placeholder="关键词\tABA排名\t参考搜索量\n空气炸锅\t10000\t18000\n咖啡机\t25000\t9000")
+        st.session_state["batch_draft"] = text
+        source = text.encode("utf-8")
+        st.caption("可带表头，也可按上述顺序直接粘贴数据；支持 Excel 制表符和逗号分隔。示例参考值仅演示格式。")
+    else:
+        upload = st.file_uploader("上传 CSV、TSV 或 Excel 文件", type=["csv", "tsv", "xlsx"], max_upload_size=10, key="batch_file")
+        st.caption(f"每次最多 {MAX_ROWS:,} 行、10 MB。Excel 读取第一个工作表；含公式的单元格请先在 Excel 中计算并保存。")
+        if upload is not None:
+            source, name = upload.getvalue(), upload.name
+    signature = hashlib.sha256(source + json.dumps([name, method, country, kind, MODEL_VERSION]).encode()).hexdigest()
+    if st.button("开始批量计算", type="primary", key="run_batch"):
+        st.session_state.pop("batch_result", None)
+        try:
+            records = parse_upload(source, name) if method == "上传文件" else parse_text(source.decode("utf-8"))
+            result = batch_calculate(records, country, kind)
+            st.session_state["batch_result"] = {"signature": signature, "data": result}
+        except (ValueError, KeyError, csv.Error) as exc:
+            st.error(str(exc))
+    saved = st.session_state.get("batch_result")
+    if not saved:
+        return
+    if saved["signature"] != signature:
+        st.info("输入或默认站点／口径已更改，请点击「开始批量计算」生成新结果。")
+        return
+    data = saved["data"]
+    st.subheader("对比结果")
+    compared = pd.to_numeric(data["绝对偏差（%）"], errors="coerce").dropna()
+    cols = st.columns(4)
+    cols[0].metric("输入行数", f"{len(data):,}")
+    cols[1].metric("已估算", f"{data['估算搜索量'].notna().sum():,}")
+    cols[2].metric("可比较（参考值 > 0）", f"{len(compared):,}")
+    cols[3].metric("绝对偏差中位数", f"{compared.median():.2f}%" if len(compared) else "—")
+    st.caption("差额 = 估算 − 参考；偏差 = 差额 ÷ 参考 × 100%。正数表示估算较高，负数表示较低。参考值应来自相同站点、周／月和期间；差异不等于准确率。")
+    st.download_button("下载全部对比结果（CSV）", csv_bytes(data), "ABA批量对比结果.csv", "text/csv", on_click="ignore", key="download_results")
+    a, b = st.columns(2)
+    search = a.text_input("查找关键词", key="result_search", placeholder="输入关键词筛选")
+    scope = b.selectbox("显示哪些结果", ["全部", "有提示或未计算", "绝对偏差 ≥ 20%"], key="result_filter")
+    shown = data
+    if search: shown = shown[shown["关键词"].str.contains(search, case=False, regex=False, na=False)]
+    if scope == "有提示或未计算": shown = shown[shown["状态"] != "正常"]
+    if scope == "绝对偏差 ≥ 20%": shown = shown[pd.to_numeric(shown["绝对偏差（%）"], errors="coerce") >= 20]
+    display_cols = ["输入行号", "关键词", "站点", "口径", "输入排名", "估算搜索量", "输入参考值", "差额", "偏差（%）", "绝对偏差（%）", "状态", "说明"]
+    display = shown[display_cols].style.format(
+        {"估算搜索量": "{:,.0f}", "差额": "{:+,.2f}", "偏差（%）": "{:+.2f}", "绝对偏差（%）": "{:.2f}"},
+        na_rep="—",
+    )
+    st.dataframe(display, hide_index=True, width="stretch", height=420)
+    st.caption(f"当前显示 {len(shown):,} / {len(data):,} 行。下载始终包含全部结果、未计算行、原表附加列和模型版本；重复关键词保留原行。")
+
+
+def main():
+    st.set_page_config(page_title="ABA 搜索量计算器", page_icon="🔎", layout="wide")
+    st.title("ABA 搜索量")
+    st.write("批量估算关键词搜索量，与其他结果逐行对比。")
+    st.info("**使用说明**\n\n1. 选择默认站点和周／月。\n2. 粘贴或上传「关键词、ABA排名」，可附带参考搜索量。\n3. 点击「开始批量计算」，查看差异并下载结果。\n\n**月搜索量用 ABA 月排名，周搜索量用 ABA 周排名。** 只算一个词时，切换到「单个计算」。")
+    left, right = st.columns(2)
+    country_label = left.selectbox("默认站点", list(COUNTRIES), key="country")
+    kind_label = right.selectbox("默认口径", list(KINDS), key="kind")
+    country, kind = COUNTRIES[country_label], KINDS[kind_label]
+    model = next(m for m in MODEL_DATA["models"] if m["country"] == country and m["kind"] == kind)
+    st.caption(f"{country_label} · {kind_label}：拟合样本排名覆盖 {model['rmin']:,.0f}—{model['rmax']:,.0f}。")
+    st.markdown("**这个范围不是 ABA 官方限制。** 它是本模型用于拟合的该站点、该口径样本的最小和最大排名。超出范围缺乏校准依据，因此不外推；范围内的长尾底值和突变边界也可能有较大误差。")
+    with st.expander("为什么德国月排名是 8—743,726？查看各站点范围"):
+        st.write("近期模型使用 2025 年 9 月至 2026 年 4 月的训练／验证词拟合。其中德国月样本最小排名为 8，最大为 743,726；后者原始搜索量为底值 1。排名 1—7 并非不存在，而是未被这套拟合样本覆盖。")
+        st.write("更换站点或周／月，范围会相应变化。若要扩大范围，需要补充对应排名的真实配对样本，并重新拟合与独立验算，不能简单取消限制。")
+        ranges = [{"站点": m["country"], "口径": "月" if m["kind"] == "month" else "周", "样本最小排名": int(m["rmin"]), "样本最大排名": int(m["rmax"])} for m in MODEL_DATA["models"]]
+        st.dataframe(pd.DataFrame(ranges), hide_index=True, width="stretch")
+    bulk, single = st.tabs(["批量对比", "单个计算"])
+    with bulk: render_batch(country, kind)
+    with single: render_single(model)
     st.divider()
-    st.caption(f"模型版本：{MODEL_VERSION} · 当前选择的数据验证截至：{cutoff}")
+    st.caption(f"模型版本：{MODEL_VERSION} · 当前默认选择的数据验证截至：{validation_end(country, kind)}")
     st.caption("这是对卖家精灵导出数据的近似拟合，不是亚马逊官方搜索次数。未来换算口径可能变化；本应用不会自动更新参数。")
 
 
